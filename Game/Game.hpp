@@ -8,15 +8,16 @@
 #define SQUARES 64
 
 enum Piece : unsigned char {
-	EMPTY =  0b0000,
-	PAWN   = 0b0001,
-	KNIGHT = 0b0010,
-	BISHOP = 0b0011,
-	ROOK   = 0b0100,
-	QUEEN  = 0b0101,
-	KING   = 0b0110,
-	WHITE  = 0b0000,
-	BLACK =  0b1000,
+	EMPTY     =  0b0000,
+	PAWN      = 0b0001,
+	KNIGHT    = 0b0010,
+	BISHOP    = 0b0011,
+	ROOK      = 0b0100,
+	QUEEN     = 0b0101,
+	KING      = 0b0110,
+	PIECEMASK = 0b0111,
+	WHITE     = 0b0000,
+	BLACK     =  0b1000,
 };
 
 enum Flag {
@@ -42,16 +43,16 @@ typedef struct Move_t {
 } Move;
 
 typedef struct GameState_t {
-	Piece pieces[64];
-	uint64_t occupiedByColor[2];
-	uint64_t occupied;
-	uint64_t enPassant;
-	int kingPosition[2];
-	bool castling[2][2];
-	int halfMove;
-	int fullMove;
-	bool turn;
-} GameState;
+	Piece pieces[64]; 			 	// 64 bytes
+	uint64_t occupiedByColor[2]; 	// 16 bytes
+	uint64_t occupied;			 	// 8 bytes
+	uint64_t enPassant;				// 8 bytes
+	unsigned char kingPosition[2];	// 2 bytes
+	bool castling[2][2];			// 4 bytes
+	unsigned short halfMove;		// 2 bytes
+	unsigned short fullMove;		// 2 bytes
+	bool turn;						// 1 byte
+} GameState;						// 107 bytes
 
 class Game {
 private:
@@ -78,11 +79,14 @@ private:
 	void getKingMoves(int position, bool color, Move ** moveList);
 
 public:
+	Game(GameState stateIn);
 	Game(char input[150] = 0);
 	void printBoard();
 	void getLegalMoves(Move ** moveList);
 	void printMoveList(Move * beginning, Move * end);
 	void doMove(Move move);
+	void doPerft(int depth, uint64_t * moveCount);
+	uint64_t enumeratedPerft(int depth);
 };
 
 #endif

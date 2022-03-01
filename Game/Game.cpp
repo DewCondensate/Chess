@@ -5,6 +5,7 @@
 
 uint64_t ONE64 = 1;
 uint64_t ALLSET = ~((uint64_t) 0);
+const int MAXMOVESPOSSIBLE = 220;
 
 int convert(int x, int y) {
 	return y * 8 + x;
@@ -38,6 +39,10 @@ Piece getPieceFromChar(char in) {
 		default:
 			return EMPTY;
 	}
+}
+
+Game::Game(GameState stateIn) {
+	state = state;
 }
 
 unsigned char rookPositions[64] {0};
@@ -101,11 +106,8 @@ Game::Game(char inputString[150]) {
 		}
 	}
 	index++;
-	printf("%c\n", input[index]);
 	state.turn = input[index] == 'b';
 	index++;
-	printf("%c\n", input[index]);
-
 	while(input[index] == 'k' || input[index] == 'Q' || input[index] == 'K' || input[index] == 'Q' || input[index] == ' ' || input[index] == '-') {
 		switch(input[index]) {
 			case 'k':
@@ -125,12 +127,9 @@ Game::Game(char inputString[150]) {
 		}
 		index++;
 	}
-	index+=2;
 
-
-	// THIS IS NOT WORKING FOR ALL VALUES TRY: "3r2k1/8/8/3Pp3/8/8/8/3K4 w - e6 0 2"
 	if(input[index] >= 'a' && input[index] <= 'z') {
-		state.enPassant |= ONE64 << convert(8 - (input[index + 1] - '0'), input[index] - 'a');
+		state.enPassant |= ONE64 << convert(input[index] - 'a', 8 - (input[index + 1] - '0'));
 		index += 2;
 	}
 
@@ -148,7 +147,6 @@ Game::Game(char inputString[150]) {
 		state.fullMove += input[index] - '0';
 		index++;
 	}
-	printUint(state.enPassant);
 	readMagicBitboards();
 }
 
@@ -175,6 +173,7 @@ void Game::printBoard() {
 				colorShift = 'a' - 'A';
 			}
 			printf("| %c ", pieceChars[state.pieces[convert(x, y)]] + colorShift);
+			// printf("| %d ", state.pieces[convert(x, y)]);
 		}
 		printf("|\n");
 	}
@@ -283,7 +282,6 @@ bool Game::isSquareSafe(int position, bool color) {
 	Piece piece = PAWN;
 	while(attacks) {
 		if(state.pieces[__builtin_ctzl(attacks)] == piece) {
-			printf("Unsafe by pawn\n");
 			return false;
 		}
 		attacks &= attacks - 1;
@@ -293,7 +291,6 @@ bool Game::isSquareSafe(int position, bool color) {
 	piece = KNIGHT;
 	while(attacks) {
 		if(state.pieces[__builtin_ctzl(attacks)] == piece) {
-			printf("Unsafe by knight\n");
 			return false;
 		}
 		attacks &= attacks - 1;
@@ -304,7 +301,6 @@ bool Game::isSquareSafe(int position, bool color) {
 	Piece piece2 = QUEEN;
 	while(attacks) {
 		if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
-			printf("Unsafe by bishop\n");
 			return false;
 		}
 		attacks &= attacks - 1;
@@ -315,7 +311,6 @@ bool Game::isSquareSafe(int position, bool color) {
 	piece2 = QUEEN;
 	while(attacks) {
 		if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
-			printf("Unsafe by rook\n");
 			return false;
 		}
 		attacks &= attacks - 1;
@@ -325,7 +320,6 @@ bool Game::isSquareSafe(int position, bool color) {
 	piece = KING;
 	while(attacks) {
 		if(state.pieces[__builtin_ctzl(attacks)] == piece) {
-			printf("Unsafe by king\n");
 			return false;
 		}
 		attacks &= attacks - 1;
@@ -397,22 +391,14 @@ void Game::getPawnMoves(int position, bool color, Move ** moveList) {
 	}
 
 	output |= pawnAttacks[color][position] & state.enPassant & piecePinned;
-	printf("PAWN AT: %d\n", position);
-	printUint(pawnAttacks[color][position]);
-	printUint(state.enPassant);
-	printUint(output);
 	// Checking for en passant
 	if(output) {
-		printf("ENPASSANT POSSIBLE ON: %d\n", position);
 		// Special case if enPassant causes the king to be in check.
 		// Remove the taking pawn from the board
 		state.occupiedByColor[color] &= ~(ONE64 << position);
 		state.occupied &= ~(ONE64 << position);
 		// Check if the pawn you are taking is "pinned" to the king
-		printf("PIECE PINNED:\n");
-		printUint(isPiecePinned(__builtin_ctzl(state.enPassant), color));
 		if(isPiecePinned(__builtin_ctzl(state.enPassant), color)) {
-			printf("PIECE IS NO PINNED, ADDING");
 			*(*moveList)++ = createMove(position, __builtin_ctzl(output), ENPASSANT);
 		}
 		// Add back the pawn so there are no weird effects
@@ -506,4 +492,105 @@ void Game::printMoveList(Move * beginning, Move * end) {
 	for(Move * i = beginning; i < end; i++) {
 		printf("%c%d%c%d\n", i->from % 8 + 'a', 7 - (i->from / 8) + 1, i->to % 8 + 'a', 7 - (i->to / 8) + 1);
 	}
+}
+
+// enum Flag {
+// 	NONE 		   = 0b0000,
+// 	PAWNDOUBLEJUMP = 0b0001,
+// 	KINGMOVE       = 0b0010,
+// 	RIGHTROOKMOVE  = 0b0011,
+// 	LEFTROOKMOVE   = 0b0100,
+// 	RIGHTCASTLE    = 0b0101,
+// 	LEFTCASTLE     = 0b0110,
+// 	ENPASSANT      = 0b0111,
+// 	PROMOTE        = 0b1000,
+// 	PROMOTEKNIGHT  = PROMOTE | KNIGHT,
+// 	PROMOTEBISHOP  = PROMOTE | BISHOP,
+// 	PROMOTEROOK    = PROMOTE | ROOK,
+// 	PROMOTEQUEEN   = PROMOTE | QUEEN
+// };
+
+// typedef struct GameState_t {
+// 	Piece pieces[64]; 			 	// 64 bytes
+// 	uint64_t occupiedByColor[2]; 	// 16 bytes
+// 	uint64_t occupied;			 	// 8 bytes
+// 	uint64_t enPassant;				// 8 bytes
+// 	unsigned char kingPosition[2];	// 2 bytes
+// 	bool castling[2][2];			// 4 bytes
+// 	unsigned short halfMove;		// 2 bytes
+// 	unsigned short fullMove;		// 2 bytes
+// 	bool turn;						// 1 byte
+// } GameState;
+
+void Game::doMove(Move move) {
+	static char direction[2] = {-8, 8};
+	// goto array?
+	state.enPassant = 0;
+	state.occupiedByColor[state.turn]  &= ~(ONE64 << move.from); // Remove 'ghost' of piece
+	state.occupiedByColor[state.turn]  |=  (ONE64 << move.from); // Move piece to square
+	state.occupiedByColor[!state.turn] &= ~(ONE64 << move.to);   // Take enemy piece
+	state.pieces[move.to] = state.pieces[move.from];
+	state.pieces[move.from] = EMPTY;
+	switch(move.flag) {
+		case NONE:
+			break;
+		case PAWNDOUBLEJUMP:
+			state.enPassant = ONE64 << (move.from + direction[state.turn]);
+			break;
+		case KINGMOVE:
+			state.kingPosition[state.turn] = move.to;
+			state.castling[state.turn][0] = false;
+			state.castling[state.turn][1] = true;
+		case RIGHTCASTLE:
+		case LEFTCASTLE:
+			state.castling[state.turn][move.flag & 1] = false;
+			break;
+		case ENPASSANT:
+			state.occupiedByColor[!state.turn] &= ~(ONE64 << (move.to - direction[state.turn]));
+			state.pieces[move.to - direction[state.turn]] = EMPTY;
+			break;
+		case PROMOTE:
+			state.pieces[move.to] = (Piece) (move.flag & PIECEMASK);
+			break;
+	}
+	state.occupied = state.occupiedByColor[0] | state.occupiedByColor[1];
+	state.turn = !state.turn;
+}
+
+void Game::doPerft(int depth, uint64_t * moveCount) {
+	Move moveStart[MAXMOVESPOSSIBLE];
+	Move * moves = moveStart;
+	getLegalMoves(&moves);
+	GameState redo = state;
+	if(depth == 1) {
+		*moveCount += moves - moveStart;
+		return;
+	}
+
+	for(Move * i = moveStart; i < moves; i++) {
+		doMove(*i);
+		doPerft(depth - 1, moveCount);
+		state = redo;
+	}
+}
+
+uint64_t Game::enumeratedPerft(int depth) {
+	Move moveStart[MAXMOVESPOSSIBLE];
+	Move * moves = moveStart;
+	getLegalMoves(&moves);
+	GameState redo = state;
+	uint64_t moveCountTotal = 0;
+	uint64_t tempMoveCount;
+	for(Move * i = moveStart; i < moves; i++) {
+		doMove(*i);
+		printf("%c%d%c%d: ", i->from % 8 + 'a', 7 - (i->from / 8) + 1, i->to % 8 + 'a', 7 - (i->to / 8) + 1);
+		tempMoveCount = 0;
+		doPerft(depth - 1, &tempMoveCount);
+		moveCountTotal += tempMoveCount;
+		printf("%d\n", tempMoveCount);
+		state = redo;
+	}
+
+	printf("Nodes: %d\n", moveCountTotal);
+	return moveCountTotal;
 }
