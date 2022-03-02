@@ -27,7 +27,7 @@ int main(int argc, char * argv[]) {
 	// MOST RECENT ERROR:
 	// position fen 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 0
 
-	Game game = Game("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 ");
+	Game game = Game();
 	// move("b4", "c5", NONE, &game);
 	// move("b2", "a1", PROMOTEQUEEN, &game);
 	// move("a4", "b3", NONE, &game);
