@@ -42,7 +42,7 @@ Piece getPieceFromChar(char in) {
 }
 
 Game::Game(GameState stateIn) {
-	state = state;
+	state = stateIn;
 }
 
 unsigned char rookPositions[64] {0};
@@ -108,7 +108,7 @@ Game::Game(char inputString[150]) {
 	index++;
 	state.turn = input[index] == 'b';
 	index++;
-	while(input[index] == 'k' || input[index] == 'Q' || input[index] == 'K' || input[index] == 'Q' || input[index] == ' ' || input[index] == '-') {
+	while(input[index] == 'k' || input[index] == 'Q' || input[index] == 'K' || input[index] == 'q' || input[index] == ' ' || input[index] == '-') {
 		switch(input[index]) {
 			case 'k':
 				state.castling[1][1] = true;
@@ -148,6 +148,66 @@ Game::Game(char inputString[150]) {
 		index++;
 	}
 	readMagicBitboards();
+	state.blockerMoves = getBlockingMoves(state.kingPosition[state.turn], state.turn);
+}
+
+void Game::printFen() {
+	char letters[] = " PNBRQK";
+	int counter = 0;
+	for(int y = 0; y < 8; y++) {
+		for(int x = 0; x < 8; x++) {
+			if(state.pieces[convert(x, y)] == EMPTY) {
+				counter++;
+			} else {
+				if(counter != 0) {
+					printf("%d", counter);
+					counter = 0;
+				}
+				printf("%c", letters[state.pieces[convert(x, y)]] + (state.occupiedByColor[1] >> convert(x, y) & 1) * ('a' - 'A'));
+			}
+		}
+		if(counter != 0) {
+			printf("%d", counter);
+			counter = 0;
+		}
+		if(y != 7) {
+			printf("/");
+		}
+	}
+	printf(" ");
+
+	printf("%c ", state.turn ? 'b' : 'w');
+
+	char castling[2][2] = {{'Q', 'K'}, {'q', 'k'}};
+	if(state.castling[0][0] + state.castling[0][1] + state.castling[1][0] + state.castling[1][1] > 2) {
+		for(int i = 0; i < 2; i++) {
+			for(int j = 1; j > -1; j--) {
+				if(state.castling[i][j]) {
+					printf("%c", castling[i][j]);
+				}
+			}
+		}
+		printf(" ");
+	} else if(state.castling[0][0] + state.castling[0][1] + state.castling[1][0] + state.castling[1][1] > 0) {
+		for(int i = 0; i < 2; i++) {
+			for(int j = 0; j < 2; j++) {
+				if(state.castling[i][j]) {
+					printf("%c", castling[i][j]);
+				}
+			}
+		}
+		printf(" - ");
+	} else {
+		printf("- ");
+	}
+
+	if(state.enPassant) {
+		int pos = __builtin_ctzl(state.enPassant);
+		printf("%c%c ", pos % 8 + 'a', (8 - pos / 8) + '0');
+	}
+
+	printf("%d ", state.halfMove);
+	printf("%d\n", state.fullMove);
 }
 
 void Game::printBoard() {
@@ -181,7 +241,7 @@ void Game::printBoard() {
 	for(int i = 0; i < 8; i++) {
 		printf("%c   ", 'a' + i);
 	}
-	printf("\n");
+	printf("\n\n");
 }
 
 uint64_t pawnMoves[2][64];
@@ -190,6 +250,8 @@ uint64_t pawnAttacks[2][64];
 uint64_t knightMoves[64];
 uint64_t kingMoves[64];
 uint64_t kingSpecialMoves[2][2];
+uint64_t bishopFullMask[64];
+uint64_t rookFullMask[64];
 Magic rookMagics[64];
 Magic bishopMagics[64];
 uint64_t ** rookAttackTable;
@@ -212,6 +274,13 @@ void Game::readMagicBitboards() {
         rookMagics[i].readFromFile(rFile);
         bishopMagics[i].readFromFile(bFile);
     }
+    fclose(rFile);
+    fclose(bFile);
+
+    bFile = fopen("bishopFullMasks.bits", "rb");
+    rFile = fopen("rookFullMasks.bits", "rb");
+    fread(rookFullMask, SQUARES, sizeof(uint64_t), rFile);
+    fread(bishopFullMask, SQUARES, sizeof(uint64_t), bFile);
     fclose(rFile);
     fclose(bFile);
 
@@ -250,11 +319,11 @@ uint64_t Game::isPiecePinned(int position, bool color) {
 		Piece piece = BISHOP;
 		Piece piece2 = QUEEN;
 		// Checking if a bishop is on the same diagonal as the king and one other piece.
-		uint64_t attacks = getBishopAttacks(position) & state.occupiedByColor[!color];
+		uint64_t attacks = bishopFullMask[state.kingPosition[color]] & getBishopAttacks(position) & state.occupiedByColor[!color];
 		while(attacks) {
 			if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
 				// Returns the squares that a piece could move in to stay pinned without the king getting attacked.
-				return bishopMagics[position].mask & bishopMagics[state.kingPosition[color]].mask;
+				return (bishopMagics[position].mask & bishopMagics[state.kingPosition[color]].mask) | (ONE64 << __builtin_ctzl(attacks));
 			}
 			attacks &= attacks - 1;
 		}
@@ -263,17 +332,78 @@ uint64_t Game::isPiecePinned(int position, bool color) {
 		Piece piece = ROOK;
 		Piece piece2 = QUEEN;
 		// Checking if a rook is on the same diagonal as the king and one other piece.
-		uint64_t attacks = getRookAttacks(position) & state.occupiedByColor[!color];
+		uint64_t attacks = rookFullMask[state.kingPosition[color]] & getRookAttacks(position) & state.occupiedByColor[!color];
 		while(attacks) {
 			if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
 				// Returns the squares that a piece could move in to stay pinned without the king getting attacked.
-				return rookMagics[position].mask & rookMagics[state.kingPosition[color]].mask;
+				return (rookMagics[position].mask & rookMagics[state.kingPosition[color]].mask) | (ONE64 << __builtin_ctzl(attacks));
 			}
 			attacks &= attacks - 1;
 		}
 		return ALLSET;
 	}
 	return ALLSET;
+}
+
+uint64_t Game::getBlockingMoves(int position, bool color) {
+	uint64_t output = ~((uint64_t) 0);
+	// Gets the pawn attacks from the square, then checks if there is an enemy pawn there
+	uint64_t attacks = getPawnAttacks(position, color) & state.occupiedByColor[!color];
+	Piece piece = PAWN;
+	while(attacks) {
+		if(state.pieces[__builtin_ctzl(attacks)] == piece) {
+			output &= (ONE64 << __builtin_ctzl(attacks));
+		}
+		attacks &= attacks - 1;
+	}
+
+	attacks = getKnightAttacks(position) & state.occupiedByColor[!color];
+	piece = KNIGHT;
+	while(attacks) {
+		if(state.pieces[__builtin_ctzl(attacks)] == piece) {
+			output &= (ONE64 << __builtin_ctzl(attacks));
+		}
+		attacks &= attacks - 1;
+	}
+
+	uint64_t mask = getBishopAttacks(position);
+	attacks = mask & state.occupiedByColor[!color];
+	piece = BISHOP;
+	Piece piece2 = QUEEN;
+	while(attacks) {
+		if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
+			output &= ((getBishopAttacks(__builtin_ctzl(attacks)) & mask) | (ONE64 << __builtin_ctzl(attacks)));
+		}
+		attacks &= attacks - 1;
+	}
+
+	mask = getRookAttacks(position);
+	attacks = mask & state.occupiedByColor[!color];
+	piece = ROOK;
+	piece2 = QUEEN;
+
+	while(attacks) {
+		state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2;
+
+		if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
+			output = output;
+			output &= ((getRookAttacks(__builtin_ctzl(attacks)) & mask) | (ONE64 << __builtin_ctzl(attacks)));
+		}
+
+		attacks &= attacks - 1;
+	}
+
+
+	attacks = getKingAttacks(position) & state.occupiedByColor[!color];
+	piece = KING;
+	while(attacks) {
+		if(state.pieces[__builtin_ctzl(attacks)] == piece) {
+			output &= (ONE64 << __builtin_ctzl(attacks));
+		}
+		attacks &= attacks - 1;
+	}
+
+	return output;
 }
 
 bool Game::isSquareSafe(int position, bool color) {
@@ -361,6 +491,8 @@ Move createMove(uint8_t from, uint8_t to, Flag flag) {
 }
 
 void Game::getPawnMoves(int position, bool color, Move ** moveList) {
+	// printf("TURN %d %d %d\n", state.turn, position < 16, state.turn ? position < 16 : position >= 48);
+	bool isPromotion = state.turn ? position >= 48 : position < 16;
 	static uint64_t horizontalMasks[8] = {0xff00000000000000, 
 								 0x00ff000000000000, 
 								 0x0000ff0000000000,
@@ -372,43 +504,58 @@ void Game::getPawnMoves(int position, bool color, Move ** moveList) {
 	// There is probably some bit trick here OPTIMIZE
 	uint64_t piecePinned = isPiecePinned(position, color);
 	uint64_t output = pawnMoves[color][position] & ~state.occupied & piecePinned;
+	if((output & state.blockerMoves)) {
+		if(isPromotion) {
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PROMOTEKNIGHT);
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PROMOTEBISHOP);
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PROMOTEROOK);
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PROMOTEQUEEN);
+		} else {
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), NONE);
+		}
+	}
 	if(output == pawnMoves[color][position]) {
 		// Get rid of single jump move.
-		*(*moveList)++ = createMove(position, __builtin_ctzl(output), NONE);
 		output &= output - 1;
-		output |= pawnDoubleMoves[color][position] & ~state.occupied & piecePinned;
+		output |= pawnDoubleMoves[color][position] & ~state.occupied & piecePinned & state.blockerMoves;
 		// Check if double move is possible
 		if(output) {
 			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PAWNDOUBLEJUMP);
-			output &= output - 1;
 		}
 	}
+	output = 0;
 
-	output |= pawnAttacks[color][position] & (state.occupiedByColor[!color]) & piecePinned;
+	output |= pawnAttacks[color][position] & (state.occupiedByColor[!color]) & piecePinned & state.blockerMoves;
 	while(output) {
-		*(*moveList)++ = createMove(position, __builtin_ctzl(output), NONE);
+		if(isPromotion) {
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PROMOTEKNIGHT);
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PROMOTEBISHOP);
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PROMOTEROOK);
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), PROMOTEQUEEN);
+		} else {
+			*(*moveList)++ = createMove(position, __builtin_ctzl(output), NONE);
+		}
 		output &= output - 1;
 	}
-
-	output |= pawnAttacks[color][position] & state.enPassant & piecePinned;
+	uint64_t blocker = state.turn ? (state.blockerMoves << 8) : (state.blockerMoves >> 8);
+	blocker = state.enPassant == blocker ? ~((uint64_t) 0) : state.blockerMoves;
+	output |= pawnAttacks[color][position] & state.enPassant & piecePinned & blocker;
 	// Checking for en passant
 	if(output) {
 		// Special case if enPassant causes the king to be in check.
 		// Remove the taking pawn from the board
-		state.occupiedByColor[color] &= ~(ONE64 << position);
 		state.occupied &= ~(ONE64 << position);
 		// Check if the pawn you are taking is "pinned" to the king
-		if(isPiecePinned(__builtin_ctzl(state.enPassant), color)) {
+		if(isPiecePinned(__builtin_ctzl(state.enPassant) + (state.turn ? -8 : 8), color) & output) {
 			*(*moveList)++ = createMove(position, __builtin_ctzl(output), ENPASSANT);
 		}
 		// Add back the pawn so there are no weird effects
-		state.occupiedByColor[color] |= (ONE64 << position);
 		state.occupied |= (ONE64 << position);
 	}
 }
 
 void Game::getKnightMoves(int position, bool color, Move ** moveList) {
-	uint64_t output = knightMoves[position] & ~state.occupiedByColor[color] & isPiecePinned(position, color);
+	uint64_t output = knightMoves[position] & ~state.occupiedByColor[color] & isPiecePinned(position, color) & state.blockerMoves;
 	while(output) {
 		*(*moveList)++ = createMove(position, __builtin_ctzl(output), NONE);
 		output &= output - 1;
@@ -418,7 +565,7 @@ void Game::getKnightMoves(int position, bool color, Move ** moveList) {
 void Game::getBishopMoves(int position, bool color, Move ** moveList) {
 	uint64_t blockerBoard = (state.occupied) & bishopMagics[position].mask;
 	int index = getValueFromBlockerBoard(blockerBoard, bishopMagics[position]);
-    uint64_t output = bishopAttackTable[position][index] & ~state.occupiedByColor[color] & isPiecePinned(position, color);
+    uint64_t output = bishopAttackTable[position][index] & ~state.occupiedByColor[color] & isPiecePinned(position, color) & state.blockerMoves;
 	while(output) {
 		*(*moveList)++ = createMove(position, __builtin_ctzl(output), NONE);
 		output &= output - 1;
@@ -428,9 +575,13 @@ void Game::getBishopMoves(int position, bool color, Move ** moveList) {
 void Game::getRookMoves(int position, bool color, Move ** moveList) {
 	uint64_t blockerBoard = (state.occupied) & rookMagics[position].mask;
 	int index = getValueFromBlockerBoard(blockerBoard, rookMagics[position]);
-    uint64_t output = rookAttackTable[position][index] & ~state.occupiedByColor[color] & isPiecePinned(position, color);
+    uint64_t output = rookAttackTable[position][index] & ~state.occupiedByColor[color] & isPiecePinned(position, color) & state.blockerMoves;
 	while(output) {
-		*(*moveList)++ = createMove(position, __builtin_ctzl(output), flagByIndex[rookPositions[position]]);
+		Flag flag = NONE;
+		if(position == (color ? 0 : 56) || position == (color ? 7 : 63)) {
+			flag = flagByIndex[rookPositions[position]];
+		}
+		*(*moveList)++ = createMove(position, __builtin_ctzl(output), flag);
 		output &= output - 1;
 	}
 }
@@ -443,25 +594,36 @@ void Game::getQueenMoves(int position, bool color, Move ** moveList) {
 void Game::getKingMoves(int position, bool color, Move ** moveList) {
 	uint64_t output;
 	uint64_t tempMoves = kingMoves[position] & ~state.occupiedByColor[color];
+	// Removing the king from the board temporarily so the bishops and rooks can "x-ray" through the king.
+	state.occupied &= ~(ONE64 << state.kingPosition[state.turn]);
 	while(tempMoves) {
 		if(isSquareSafe(__builtin_ctzl(tempMoves), color)) {
 			*(*moveList)++ = createMove(position, __builtin_ctzl(tempMoves), KINGMOVE);
 		}
 		tempMoves &= tempMoves - 1;
 	}
+	state.occupied |= (ONE64 << state.kingPosition[state.turn]);
+
 
 	// Lots of testing to be done on castling branches
-	if(position == 60/*OPTIMIZE TO THE FOLLOWING: && castling[color][0] | castling[color][1]*/ /*OR... && castling[color][0] || castling[color][1]*/) {
+	if(position == 60 || position == 4/*OPTIMIZE TO THE FOLLOWING: && castling[color][0] | castling[color][1]*/ /*OR... && castling[color][0] || castling[color][1]*/) {
 		if(state.castling[color][0]) {
 			// This is super hacky. Just checking the square the king is moving to is safe and the square it hops over is safe
-			if(kingSpecialMoves[color][0] & output == kingSpecialMoves[color][0] && isSquareSafe(position - 2, color)) {
-				*(*moveList)++ = createMove(position - 2, __builtin_ctzl(output), LEFTCASTLE);
+			if((kingSpecialMoves[color][0] & ~state.occupied) == kingSpecialMoves[color][0] && 
+					isSquareSafe(position - 2, color) && 
+					isSquareSafe(position - 1, color) && 
+					state.blockerMoves == (~(uint64_t) 0) &&
+					!(state.occupied >> (position - 3) & 1)) {
+				*(*moveList)++ = createMove(position, position - 2, LEFTCASTLE);
 			}
 		}
 		if(state.castling[color][1]) {
 			// This is super hacky. Just checking the square the king is moving to is safe and the square it hops over is safe
-			if(kingSpecialMoves[color][1] & output == kingSpecialMoves[color][1] && isSquareSafe(position + 2, color)) {
-				*(*moveList)++ = createMove(position - 2, __builtin_ctzl(output), RIGHTCASTLE);
+			if((kingSpecialMoves[color][1] & ~state.occupied) == kingSpecialMoves[color][1] && 
+					isSquareSafe(position + 2, color) && 
+					isSquareSafe(position + 1, color) && 
+					state.blockerMoves == (~(uint64_t) 0)) {
+				*(*moveList)++ = createMove(position, position + 2, RIGHTCASTLE);
 			}
 		}
 	}
@@ -523,38 +685,107 @@ void Game::printMoveList(Move * beginning, Move * end) {
 // } GameState;
 
 void Game::doMove(Move move) {
+	// This reduces branching. It's ugly, but fast.
+	static bool rookPositions[64] = {1, 0, 0, 0, 0, 0, 0, 1,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 1, 0, 0, 0, 0, 0, 0, 1};
+
+	static bool rAO[64] = 			{1, 0, 0, 0, 0, 0, 0, 1,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0};
+
+	static bool rAT[64] = 			{0, 0, 0, 0, 0, 0, 0, 1,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 0,
+									 0, 0, 0, 0, 0, 0, 0, 1};
+
+	if(rookPositions[move.to]) {
+		state.castling[rAO[move.to]][rAT[move.to]] = false;
+	}
 	static char direction[2] = {-8, 8};
 	// goto array?
 	state.enPassant = 0;
 	state.occupiedByColor[state.turn]  &= ~(ONE64 << move.from); // Remove 'ghost' of piece
-	state.occupiedByColor[state.turn]  |=  (ONE64 << move.from); // Move piece to square
+	state.occupiedByColor[state.turn]  |=  (ONE64 << move.to); // Move piece to square
 	state.occupiedByColor[!state.turn] &= ~(ONE64 << move.to);   // Take enemy piece
+
 	state.pieces[move.to] = state.pieces[move.from];
 	state.pieces[move.from] = EMPTY;
+
 	switch(move.flag) {
 		case NONE:
 			break;
 		case PAWNDOUBLEJUMP:
-			state.enPassant = ONE64 << (move.from + direction[state.turn]);
+			state.enPassant = (ONE64 << (move.from + direction[state.turn]));
 			break;
 		case KINGMOVE:
 			state.kingPosition[state.turn] = move.to;
 			state.castling[state.turn][0] = false;
-			state.castling[state.turn][1] = true;
+			state.castling[state.turn][1] = false;
+			break;
+		case LEFTROOKMOVE:
+			state.castling[state.turn][0] = false;
+			break;
+		case RIGHTROOKMOVE:
+			state.castling[state.turn][1] = false;
+			break;
 		case RIGHTCASTLE:
+			state.kingPosition[state.turn] = move.to;
+			state.occupiedByColor[state.turn] &= ~(ONE64 << (move.to + 1)); // Remove 'ghost' of piece
+			state.occupiedByColor[state.turn] |=  (ONE64 << (move.to - 1));   // Take put piece there
+			state.pieces[move.to - 1] = state.pieces[move.to + 1];
+			state.pieces[move.to + 1] = EMPTY;
+			state.castling[state.turn][0] = false;
+			state.castling[state.turn][1] = false;
+			break;
 		case LEFTCASTLE:
-			state.castling[state.turn][move.flag & 1] = false;
+			state.kingPosition[state.turn] = move.to;
+			state.occupiedByColor[state.turn] &= ~(ONE64 << (move.to - 2)); // Remove 'ghost' of piece
+			state.occupiedByColor[state.turn] |=  (ONE64 << (move.to + 1));   // Take put piece there
+			state.pieces[move.to + 1] = state.pieces[move.to - 2];
+			state.pieces[move.to - 2] = EMPTY;
+			state.castling[state.turn][0] = false;
+			state.castling[state.turn][1] = false;
 			break;
 		case ENPASSANT:
 			state.occupiedByColor[!state.turn] &= ~(ONE64 << (move.to - direction[state.turn]));
 			state.pieces[move.to - direction[state.turn]] = EMPTY;
 			break;
-		case PROMOTE:
+		case PROMOTEQUEEN:
+		case PROMOTEKNIGHT:
+		case PROMOTEBISHOP:
+		case PROMOTEROOK:
+			// printf("PROMOTING TO: %d\n", move.flag & PIECEMASK);
 			state.pieces[move.to] = (Piece) (move.flag & PIECEMASK);
+			break;
+		default:
 			break;
 	}
 	state.occupied = state.occupiedByColor[0] | state.occupiedByColor[1];
 	state.turn = !state.turn;
+	state.blockerMoves = getBlockingMoves(state.kingPosition[state.turn], state.turn);
+}
+
+void printMove(Move move) {
+	static char promotionChar[] = "  nbrq";
+	printf("%c%d%c%d", move.from % 8 + 'a', 7 - (move.from / 8) + 1, move.to % 8 + 'a', 7 - (move.to / 8) + 1);
+	if(move.flag & PROMOTE) {
+		printf("%c", promotionChar[move.flag & PIECEMASK]);
+	}
 }
 
 void Game::doPerft(int depth, uint64_t * moveCount) {
@@ -578,19 +809,33 @@ uint64_t Game::enumeratedPerft(int depth) {
 	Move moveStart[MAXMOVESPOSSIBLE];
 	Move * moves = moveStart;
 	getLegalMoves(&moves);
+	if(depth == 1) {
+		for(Move * i = moveStart; i < moves; i++) {
+			printMove(*i);
+			printf(": 1\n");
+		}
+		printf("\nNodes searched: %llu\n", moves - moveStart);
+		return moves - moveStart;
+	}
 	GameState redo = state;
 	uint64_t moveCountTotal = 0;
 	uint64_t tempMoveCount;
 	for(Move * i = moveStart; i < moves; i++) {
+		// 	printMove(*i);
 		doMove(*i);
-		printf("%c%d%c%d: ", i->from % 8 + 'a', 7 - (i->from / 8) + 1, i->to % 8 + 'a', 7 - (i->to / 8) + 1);
+		// if(depth == 2) {
+		// 	printf("\n");
+		// 	printf("\n");
+		// 	printFen();
+		// }
+		printMove(*i);
 		tempMoveCount = 0;
 		doPerft(depth - 1, &tempMoveCount);
 		moveCountTotal += tempMoveCount;
-		printf("%d\n", tempMoveCount);
+		printf(": %llu\n", tempMoveCount);
 		state = redo;
 	}
 
-	printf("Nodes: %d\n", moveCountTotal);
+	printf("\nNodes searched: %llu\n\n", moveCountTotal);
 	return moveCountTotal;
 }

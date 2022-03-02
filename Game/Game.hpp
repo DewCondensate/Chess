@@ -8,7 +8,7 @@
 #define SQUARES 64
 
 enum Piece : unsigned char {
-	EMPTY     =  0b0000,
+	EMPTY     = 0b0000,
 	PAWN      = 0b0001,
 	KNIGHT    = 0b0010,
 	BISHOP    = 0b0011,
@@ -47,12 +47,13 @@ typedef struct GameState_t {
 	uint64_t occupiedByColor[2]; 	// 16 bytes
 	uint64_t occupied;			 	// 8 bytes
 	uint64_t enPassant;				// 8 bytes
+	uint64_t blockerMoves;			// 8 bytes
 	unsigned char kingPosition[2];	// 2 bytes
 	bool castling[2][2];			// 4 bytes
 	unsigned short halfMove;		// 2 bytes
 	unsigned short fullMove;		// 2 bytes
 	bool turn;						// 1 byte
-} GameState;						// 107 bytes
+} GameState;						// 115 bytes
 
 class Game {
 private:
@@ -63,6 +64,7 @@ private:
 
 	uint64_t isPiecePinned(int position, bool color);
 	bool isSquareSafe(int position, bool color);
+	uint64_t getBlockingMoves(int position, bool color);
 
 	uint64_t getPawnAttacks(int position, bool color);
 	uint64_t getKnightAttacks(int position);
@@ -82,6 +84,7 @@ public:
 	Game(GameState stateIn);
 	Game(char input[150] = 0);
 	void printBoard();
+	void printFen();
 	void getLegalMoves(Move ** moveList);
 	void printMoveList(Move * beginning, Move * end);
 	void doMove(Move move);

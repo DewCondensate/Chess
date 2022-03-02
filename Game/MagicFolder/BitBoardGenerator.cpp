@@ -74,12 +74,6 @@ void generatePawnMoves(FILE * file) {
 					if(inBounds(tempX, tempY)) {
 						output |= ONE64 << convert(tempX, tempY);
 					}
-					if(y == (i == 0 ? 6 : 1)) { // If it's a double pawn move.
-						tempY += (i == 0 ? -1 : 1);
-						if(inBounds(tempX, tempY)) {
-							output |= ONE64 << convert(tempX, tempY);
-						}
-					}
 				}
 				fwrite(&output, 1, sizeof(uint64_t), file);
 			}
@@ -91,6 +85,11 @@ void generatePawnMoves(FILE * file) {
             for(int x = 0; x < 8; x++) {
                 output = 0;
                 if(y != 0 && y != 7) {
+                    if(i == 0) {
+                        yDir = -1;
+                    } else {
+                        yDir = 1;
+                    }
                     tempY = y + yDir;
                     tempX = x;
                     if(y == (i == 0 ? 6 : 1)) { // If it's a double pawn move.
@@ -110,13 +109,11 @@ void generatePawnMoves(FILE * file) {
 		for(int y = 0; y < 8; y++) {
 			for(int x = 0; x < 8; x++) {
 				output = 0;
-				if(y != 0 && y != 7) {
-					tempY = y + (i == 0 ? -1 : 1);
-					for(int j = -1; j < 2; j += 2) {
-						tempX = x + j;
-						if(inBounds(tempX, tempY)) {
-							output |= ONE64 << convert(tempX, tempY);
-						}
+				tempY = y + (i == 0 ? -1 : 1);
+				for(int j = -1; j < 2; j += 2) {
+					tempX = x + j;
+					if(inBounds(tempX, tempY)) {
+						output |= ONE64 << convert(tempX, tempY);
 					}
 				}
 				fwrite(&output, 1, sizeof(uint64_t), file);
@@ -245,6 +242,17 @@ void solveBBs(const uint16_t size, const uint8_t position, const uint64_t * bbs,
     }
 }
 
+void getFullMask(const uint8_t position, const Direction dirs[4], uint64_t * mask) {
+    *mask = 0;
+    int8_t index;
+    for(uint8_t i = 0; i < DIRSPERPIECE; i++) {
+        index = position;
+        while((index = getNextIndex(index, dirs[i])) != -1) {
+            *mask |= ONE64 << index;
+        }
+    }
+}
+
 void getMask(const uint8_t position, const Direction dirs[4], uint64_t * mask, uint16_t * shift) {
     *mask = 0;
     int8_t index;
@@ -324,7 +332,18 @@ void generateRookAndBishopMagics() {
 
     FILE * rFile;
     FILE * bFile;
-
+    rFile = fopen("rookFullMasks.bits", "wb");
+    bFile = fopen("bishopFullMasks.bits", "wb");
+    uint64_t rMask;
+    uint64_t bMask;
+    for(int i = 0; i < 64; i++) {
+        getFullMask(i, bDirections, &bMask);
+        getFullMask(i, rDirections, &rMask);
+        fwrite(&rMask, 1, sizeof(uint64_t), rFile);
+        fwrite(&bMask, 1, sizeof(uint64_t), bFile);
+    }
+    fclose(rFile);
+    fclose(bFile);
     rFile = fopen("rAttackTable.bits", "wb");
     bFile = fopen("bAttackTable.bits", "wb");
     for(uint8_t i = 0; i < SQUARES; i++) {
