@@ -1,4 +1,6 @@
 #include <cstdio>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #include "Game.hpp"
 
@@ -15,6 +17,8 @@ void move(char * in, char * in2, Flag flag, Game * game) {
 }
 
 int main(int argc, char * argv[]) {
+	setpriority(PRIO_PROCESS, 0, -20);
+
 	int depth;
 	if(argc > 1) {
 		depth = atoi(argv[1]);
@@ -41,15 +45,22 @@ int main(int argc, char * argv[]) {
 	printf("go perft %d\n\n", depth);
 
 	struct timespec start, stop;
-
-	clock_gettime( CLOCK_REALTIME, &start);
-	// DO TIMING
-	uint64_t count = game.enumeratedPerft(depth);
-	clock_gettime( CLOCK_REALTIME, &stop);
+	uint64_t count;
+	if(argc > 2) {
+		clock_gettime( CLOCK_REALTIME, &start);
+		// DO TIMING
+		count = game.enumeratedThreadedPerft(depth, atoi(argv[2]));
+		clock_gettime( CLOCK_REALTIME, &stop);
+	} else {
+		clock_gettime( CLOCK_REALTIME, &start);
+		// DO TIMING
+		count = game.enumeratedPerft(depth);
+		clock_gettime( CLOCK_REALTIME, &stop);
+	}
 
 
 	uint64_t accum = ( stop.tv_sec - start.tv_sec ) * 1000000000 + ( stop.tv_nsec - start.tv_nsec );
 
-	printf("Searched %llu nodes in %llu nanoseconds that is %lf nodes per second.\n", count, accum, (double) count * 1000000000 / (double) accum);
+	printf("Searched %llu nodes in:\n%llu nanoseconds\n%llu microseconds\n%llu milliseconds\n%llu seconds\nThat is %0.0lf nodes per second or %0.3lfMN/s.\n", count, accum, accum/1000, accum/1000000, accum/1000000000, (double) count * 1000000000 / (double) accum, (double) count * 1000000000 / (double) accum / 1000000);
 
 }

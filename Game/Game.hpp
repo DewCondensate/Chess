@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <pthread.h>
 
 #include "Magic.hpp"
 
@@ -88,8 +89,11 @@ public:
 	void getLegalMoves(Move ** moveList);
 	void printMoveList(Move * beginning, Move * end);
 	void doMove(Move move);
+	GameState getGameState();
 	void doPerft(int depth, uint64_t * moveCount);
+	// void * doThreadedPerft(void * input);
 	uint64_t enumeratedPerft(int depth);
+	uint64_t enumeratedThreadedPerft(int depth, int threadCount);
 };
 
 #endif

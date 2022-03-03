@@ -1,5 +1,5 @@
 Exec = main
-OPTS = -O3 -std=c++11 -g
+OPTS = -O3 -pthread -std=c++11 -g
 
 objects := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 

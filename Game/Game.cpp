@@ -45,6 +45,7 @@ Game::Game(GameState stateIn) {
 	state = stateIn;
 }
 
+
 unsigned char rookPositions[64] {0};
 Flag flagByIndex[3] = {NONE, LEFTROOKMOVE, RIGHTROOKMOVE};
 Game::Game(char inputString[150]) {
@@ -211,18 +212,6 @@ void Game::printFen() {
 }
 
 void Game::printBoard() {
-	/*
-	enum Piece {
-		EMPTY =  0b0000,
-		PAWN   = 0b0001,
-		KNIGHT = 0b0010,
-		BISHOP = 0b0011,
-		ROOK   = 0b0100,
-		QUEEN  = 0b0101,
-		KING   = 0b0110,
-		WHITE  = 0b0000,
-		BLACK =  0b1000,
-	};*/
 	char pieceChars[12] = {' ', 'P', 'N', 'B', 'R', 'Q', 'K'};
 	for(int y = 0; y < 8; y++) {
 		printf("  +–––+–––+–––+–––+–––+–––+–––+–––+\n");
@@ -314,31 +303,37 @@ inline uint32_t getValueFromBlockerBoard(const uint64_t blockerBoard, Magic &mag
 }
 
 // Returns the squares that a piece could move in to stay pinned without the king getting attacked.
+// VERY HOT PIECE OF CODE. OPTIMIZE THIS
 uint64_t Game::isPiecePinned(int position, bool color) {
-	if(getBishopAttacks(state.kingPosition[color]) >> position & 1) {
+	// Empty, pawn, knight, bishop, rook, queen, king
+	static bool pieceBoolsBish[] = {0, 0, 0, 1, 0, 1, 0};
+	// Empty, pawn, knight, bishop, rook, queen, king
+	static bool pieceBoolsRook[] = {0, 0, 0, 0, 1, 1, 0};
+	static uint64_t bishopAttacks;
+	static uint64_t rookAttacks;
+	uint8_t kingPos = state.kingPosition[color];
+	if(bishopAttacks = getBishopAttacks(kingPos) >> position & 1) {
 		Piece piece = BISHOP;
 		Piece piece2 = QUEEN;
 		// Checking if a bishop is on the same diagonal as the king and one other piece.
-		uint64_t attacks = bishopFullMask[state.kingPosition[color]] & getBishopAttacks(position) & state.occupiedByColor[!color];
-		while(attacks) {
-			if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
+		bishopAttacks = bishopFullMask[kingPos] & bishopAttacks & state.occupiedByColor[!color];
+		while(bishopAttacks) {
+			if(pieceBoolsBish[state.pieces[__builtin_ctzl(bishopAttacks)]]) {
 				// Returns the squares that a piece could move in to stay pinned without the king getting attacked.
-				return (bishopMagics[position].mask & bishopMagics[state.kingPosition[color]].mask) | (ONE64 << __builtin_ctzl(attacks));
+				return (bishopMagics[position].mask & bishopMagics[kingPos].mask) | (ONE64 << __builtin_ctzl(bishopAttacks));
 			}
-			attacks &= attacks - 1;
+			bishopAttacks &= bishopAttacks - 1;
 		}
 		return ALLSET;
-	} else if(getRookAttacks(state.kingPosition[color]) >> position & 1) {
-		Piece piece = ROOK;
-		Piece piece2 = QUEEN;
+	} else if(rookAttacks = getRookAttacks(kingPos) >> position & 1) {
 		// Checking if a rook is on the same diagonal as the king and one other piece.
-		uint64_t attacks = rookFullMask[state.kingPosition[color]] & getRookAttacks(position) & state.occupiedByColor[!color];
-		while(attacks) {
-			if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
+		rookAttacks = rookFullMask[kingPos & rookAttacks & state.occupiedByColor[!color]];
+		while(bishopAttacks) {
+			if(pieceBoolsRook[state.pieces[__builtin_ctzl(bishopAttacks)]]) {
 				// Returns the squares that a piece could move in to stay pinned without the king getting attacked.
-				return (rookMagics[position].mask & rookMagics[state.kingPosition[color]].mask) | (ONE64 << __builtin_ctzl(attacks));
+				return (rookMagics[position].mask & rookMagics[kingPos].mask) | (ONE64 << __builtin_ctzl(rookAttacks));
 			}
-			attacks &= attacks - 1;
+			bishopAttacks &= bishopAttacks - 1;
 		}
 		return ALLSET;
 	}
@@ -407,6 +402,9 @@ uint64_t Game::getBlockingMoves(int position, bool color) {
 }
 
 bool Game::isSquareSafe(int position, bool color) {
+	static bool pieceBoolsBish[] = {0, 0, 0, 1, 0, 1, 0};
+	// Empty, pawn, knight, bishop, rook, queen, king
+	static bool pieceBoolsRook[] = {0, 0, 0, 0, 1, 1, 0};
 	// Gets the pawn attacks from the square, then checks if there is an enemy pawn there
 	uint64_t attacks = getPawnAttacks(position, color) & state.occupiedByColor[!color];
 	Piece piece = PAWN;
@@ -427,20 +425,16 @@ bool Game::isSquareSafe(int position, bool color) {
 	}
 
 	attacks = getBishopAttacks(position) & state.occupiedByColor[!color];
-	piece = BISHOP;
-	Piece piece2 = QUEEN;
 	while(attacks) {
-		if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
+		if(pieceBoolsBish[state.pieces[__builtin_ctzl(attacks)]]) {
 			return false;
 		}
 		attacks &= attacks - 1;
 	}
 
 	attacks = getRookAttacks(position) & state.occupiedByColor[!color];
-	piece = ROOK;
-	piece2 = QUEEN;
 	while(attacks) {
-		if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
+		if(pieceBoolsRook[state.pieces[__builtin_ctzl(attacks)]]) {
 			return false;
 		}
 		attacks &= attacks - 1;
@@ -457,37 +451,43 @@ bool Game::isSquareSafe(int position, bool color) {
 	return true;
 }
 
+// Optimal
 uint64_t Game::getPawnAttacks(int position, bool color) {
 	return pawnAttacks[color][position];
 }
 
+// Optimal
 uint64_t Game::getKnightAttacks(int position) {
 	return knightMoves[position];
 }
 
+// Optimal
 uint64_t Game::getBishopAttacks(int position) {
 	uint64_t blockerBoard = (state.occupied) & bishopMagics[position].mask;
 	int index = getValueFromBlockerBoard(blockerBoard, bishopMagics[position]);
     return bishopAttackTable[position][index];
 }
 
+// Optimal
 uint64_t Game::getRookAttacks(int position) {
 	uint64_t blockerBoard = (state.occupied) & rookMagics[position].mask;
 	int index = getValueFromBlockerBoard(blockerBoard, rookMagics[position]);
     return rookAttackTable[position][index];
 }
 
+// Optimal
 uint64_t Game::getQueenAttacks(int position) {
 	return getRookAttacks(position) | getBishopAttacks(position);
 }
 
+// Optimal
 uint64_t Game::getKingAttacks(int position) {
 	return kingMoves[position];
 }
 
-Move createMove(uint8_t from, uint8_t to, Flag flag) {
-	Move out = {from, to, flag};
-	return out;
+// May be un-needed
+inline Move createMove(uint8_t from, uint8_t to, Flag flag) {
+	return {from, to, flag};
 }
 
 void Game::getPawnMoves(int position, bool color, Move ** moveList) {
@@ -780,11 +780,21 @@ void Game::doMove(Move move) {
 	state.blockerMoves = getBlockingMoves(state.kingPosition[state.turn], state.turn);
 }
 
-void printMove(Move move) {
+void printMove(Move move, uint64_t moves) {
 	static char promotionChar[] = "  nbrq";
-	printf("%c%d%c%d", move.from % 8 + 'a', 7 - (move.from / 8) + 1, move.to % 8 + 'a', 7 - (move.to / 8) + 1);
+	
 	if(move.flag & PROMOTE) {
-		printf("%c", promotionChar[move.flag & PIECEMASK]);
+		printf("%c%d%c%d%c: %llu\n", move.from % 8 + 'a', 
+				7 - (move.from / 8) + 1, 
+				move.to % 8 + 'a', 
+				7 - (move.to / 8) + 1, 
+				promotionChar[move.flag & PIECEMASK], 
+				moves);
+	} else {
+		printf("%c%d%c%d: %llu\n", move.from % 8 + 'a', 
+				7 - (move.from / 8) + 1, 
+				move.to % 8 + 'a', 7 - (move.to / 8) + 1, 
+				moves);
 	}
 }
 
@@ -805,14 +815,110 @@ void Game::doPerft(int depth, uint64_t * moveCount) {
 	}
 }
 
+typedef struct DataPacket_t {
+	int threadID;
+	int threadCount;
+	Game ** games;
+	uint64_t * moveCount;
+	int maxIndex;
+	int depth;
+	Move ** moves;
+} DataPacket;
+
+void * doThreadedPerft(void * input) {
+	DataPacket packet = *((DataPacket *) input);
+
+	int threadID = packet.threadID;
+	int threadCount = packet.threadCount;
+	Game ** games = packet.games;
+	uint64_t * moveCount = packet.moveCount;
+	int maxIndex = packet.maxIndex;
+	int depth = packet.depth;
+	Move ** moves = packet.moves;
+
+	uint64_t tempMoveCount = 0;
+
+	// printf("Hello from thread %d\n", threadID);
+
+	for(int i = threadID; i < maxIndex; i += threadCount) {
+		games[i]->doMove(*(moves[i]));
+		games[i]->doPerft(depth, &tempMoveCount);
+		printf("Thread %d %d: ", threadID, i);
+		printMove(*(moves[i]), tempMoveCount);
+		*moveCount += tempMoveCount;
+		tempMoveCount = 0;
+	}
+
+	pthread_exit((void*) input);
+	return input;
+}
+
+uint64_t Game::enumeratedThreadedPerft(int depth, const int threadCount) {
+	if(depth < 2) {
+		printf("Cannot run enumeratedThreadedPerft with a depth less than 2.\n");
+		exit(0);
+	}
+
+	Move moveStart[MAXMOVESPOSSIBLE];
+	Move * moves = moveStart;
+	getLegalMoves(&moves);
+	GameState redo = state;
+	uint64_t moveCountTotal = 0;
+
+	pthread_t threads[threadCount];
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    int threadError;
+    void * status;
+
+    DataPacket packets[threadCount];
+    int maxIndex = moves - moveStart;
+    Game ** games = (Game **) malloc(maxIndex * sizeof(Game *));
+    Move ** moveList = (Move **) malloc(maxIndex * sizeof(Move *));
+	uint64_t * moveCountArray = (uint64_t *) calloc(threadCount, sizeof(uint64_t));
+
+
+	for(int i = 0; i < maxIndex; i++) {
+		games[i] = new Game(state);
+		moveList[i] = &moveStart[i];
+		state = redo;
+	}
+
+	for(int i = 0; i < threadCount; i++) {
+		packets[i] = {i, threadCount, games, &moveCountArray[i], maxIndex, depth - 1, moveList};
+		threadError = pthread_create(&threads[i], &attr, doThreadedPerft, (void *) &packets[i]);  
+		if (threadError) {
+			printf("ERROR; return code from pthread_create() is %d\n", threadError);
+			exit(-1);
+		}
+	}
+
+	/* Free attribute and wait for the other threads */
+	pthread_attr_destroy(&attr);
+	for(int i = 0; i < threadCount; i++) {
+		threadError = pthread_join(threads[i], &status);
+		if (threadError) {
+			printf("ERROR; return code from pthread_join() is %d\n", threadError);
+			exit(-1);
+		}
+	}
+
+	for(int i = 0; i < threadCount; i++) {
+		moveCountTotal += moveCountArray[i];
+	}
+
+	printf("\nNodes searched: %llu\n\n", moveCountTotal);
+	return moveCountTotal;
+}
+
 uint64_t Game::enumeratedPerft(int depth) {
 	Move moveStart[MAXMOVESPOSSIBLE];
 	Move * moves = moveStart;
 	getLegalMoves(&moves);
 	if(depth == 1) {
 		for(Move * i = moveStart; i < moves; i++) {
-			printMove(*i);
-			printf(": 1\n");
+			printMove(*i, 1);
 		}
 		printf("\nNodes searched: %llu\n", moves - moveStart);
 		return moves - moveStart;
@@ -821,18 +927,11 @@ uint64_t Game::enumeratedPerft(int depth) {
 	uint64_t moveCountTotal = 0;
 	uint64_t tempMoveCount;
 	for(Move * i = moveStart; i < moves; i++) {
-		// 	printMove(*i);
 		doMove(*i);
-		// if(depth == 2) {
-		// 	printf("\n");
-		// 	printf("\n");
-		// 	printFen();
-		// }
-		printMove(*i);
 		tempMoveCount = 0;
 		doPerft(depth - 1, &tempMoveCount);
+		printMove(*i, tempMoveCount);
 		moveCountTotal += tempMoveCount;
-		printf(": %llu\n", tempMoveCount);
 		state = redo;
 	}
 
