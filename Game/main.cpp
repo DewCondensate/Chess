@@ -25,19 +25,8 @@ int main(int argc, char * argv[]) {
 	} else {
 		depth = 5;
 	}
-	// r3k2r/Pppp1ppp/1b3nbN/nPB5/2P1P3/qB3N2/q2P2PP/3Q1RK1 w k - 0 1
-	// r3k2r/Pppp1ppp/1b3nbN/nPB5/2P1P3/qB3N2/q2P2PP/3Q1RK1 w qk - 0 1
-
-	// MOST RECENT ERROR:
-	// position fen 8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 0
-
+	
 	Game game = Game();
-	// move("b4", "c5", NONE, &game);
-	// move("b2", "a1", PROMOTEQUEEN, &game);
-	// move("a4", "b3", NONE, &game);
-	// move("a1", "a2", NONE, &game);
-	// move("d1", "d2", NONE, &game);
-	// move("a5", "a4", NONE, &game);
 
 	game.printBoard();
 	printf("position fen ");
@@ -46,17 +35,9 @@ int main(int argc, char * argv[]) {
 
 	struct timespec start, stop;
 	uint64_t count;
-	if(argc > 2) {
-		clock_gettime( CLOCK_REALTIME, &start);
-		// DO TIMING
-		count = game.enumeratedThreadedPerft(depth, atoi(argv[2]));
-		clock_gettime( CLOCK_REALTIME, &stop);
-	} else {
-		clock_gettime( CLOCK_REALTIME, &start);
-		// DO TIMING
-		count = game.enumeratedPerft(depth);
-		clock_gettime( CLOCK_REALTIME, &stop);
-	}
+	clock_gettime(CLOCK_REALTIME, &start);
+	count = game.enumeratedPerft(depth);
+	clock_gettime(CLOCK_REALTIME, &stop);
 
 
 	uint64_t accum = ( stop.tv_sec - start.tv_sec ) * 1000000000 + ( stop.tv_nsec - start.tv_nsec );

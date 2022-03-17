@@ -37,13 +37,13 @@ enum Flag {
 	PROMOTEQUEEN   = PROMOTE | QUEEN
 };
 
-typedef struct Move_t {
+struct Move {
 	uint8_t from;
 	uint8_t to;
 	Flag flag;
-} Move;
+};
 
-typedef struct GameState_t {
+struct GameState {
 	Piece pieces[64]; 			 	// 64 bytes
 	uint64_t occupiedByColor[2]; 	// 16 bytes
 	uint64_t occupied;			 	// 8 bytes
@@ -54,7 +54,7 @@ typedef struct GameState_t {
 	unsigned short halfMove;		// 2 bytes
 	unsigned short fullMove;		// 2 bytes
 	bool turn;						// 1 byte
-} GameState;						// 115 bytes
+};						// 115 bytes
 
 class Game {
 private:
@@ -91,9 +91,7 @@ public:
 	void doMove(Move move);
 	GameState getGameState();
 	void doPerft(int depth, uint64_t * moveCount);
-	// void * doThreadedPerft(void * input);
 	uint64_t enumeratedPerft(int depth);
-	uint64_t enumeratedThreadedPerft(int depth, int threadCount);
 };
 
 #endif
