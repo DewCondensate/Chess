@@ -830,6 +830,63 @@ void Game::doPerft(int depth, uint64_t * moveCount) {
 	}
 }
 
+GameState Game::getGameState() {
+	return state;
+}
+
+void Game::setGameState(GameState in) {
+	state = in;
+}
+
+int max(int a, int b) {
+	return a > b ? a : b;
+}
+
+int min(int a, int b) {
+	return a < b ? a : b;
+}
+
+int Game::alphaBeta(Game * game, int depth, int alpha, int beta, bool maximizingPlayer, HeuristicFunction func) {
+    if(depth == 0) {
+        return func(&game->state);
+    }
+
+    Move moveStart[MAXMOVESPOSSIBLE];
+    Move * moves = moveStart;
+
+    game->getLegalMoves(&moves);
+
+    int value;
+    GameState undoMove = game->getGameState();
+    if(maximizingPlayer) {
+        value = INT_MIN;
+		for(Move * i = moveStart; i < moves; i++) {
+            game->doMove(*i);
+            // Check if game over
+            value = max(value, alphaBeta(game, depth - 1, alpha, beta, !maximizingPlayer, func));
+            game->setGameState(undoMove);
+            if (value >= beta) {
+                break; // beta cutoff
+            }
+            alpha = max(alpha, value);
+        }
+        return value;
+    } else {
+        value = INT_MAX;
+		for(Move * i = moveStart; i < moves; i++) {
+            game->doMove(*i);
+            // Check if game over
+            value = min(value, alphaBeta(game, depth - 1, alpha, beta, !maximizingPlayer, func));
+            game->setGameState(undoMove);
+            if (value <= alpha) {
+                break; // alpha cutoff
+            }
+            beta = min(beta, value);
+    	}
+        return value;
+    }
+}
+
 uint64_t Game::enumeratedPerft(int depth) {
 	Move moveStart[MAXMOVESPOSSIBLE];
 	Move * moves = moveStart;

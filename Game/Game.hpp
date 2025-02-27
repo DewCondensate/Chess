@@ -8,6 +8,7 @@
 
 #define SQUARES 64
 
+
 enum Piece : unsigned char {
 	EMPTY     = 0b0000,
 	PAWN      = 0b0001,
@@ -56,6 +57,8 @@ struct GameState {
 	bool turn;						// 1 byte
 };						// 115 bytes
 
+typedef int (*HeuristicFunction)(GameState *);
+
 class Game {
 private:
 	// Using a struct allows games to be easily copied for easier depth search.
@@ -90,8 +93,11 @@ public:
 	void printMoveList(Move * beginning, Move * end);
 	void doMove(Move move);
 	GameState getGameState();
+	void setGameState(GameState in);
 	void doPerft(int depth, uint64_t * moveCount);
 	uint64_t enumeratedPerft(int depth);
+	int alphaBeta(Game * game, int depth, int alpha, int beta, bool maximizingPlayer, HeuristicFunction func);
+
 };
 
 #endif
