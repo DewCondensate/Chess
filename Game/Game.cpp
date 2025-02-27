@@ -164,7 +164,7 @@ void Game::printFen() {
 					printf("%d", counter);
 					counter = 0;
 				}
-				printf("%c", letters[state.pieces[convert(x, y)]] + (state.occupiedByColor[1] >> convert(x, y) & 1) * ('a' - 'A'));
+				printf("%c", (char) (letters[state.pieces[convert(x, y)]] + (state.occupiedByColor[1] >> convert(x, y) & 1) * ('a' - 'A')));
 			}
 		}
 		if(counter != 0) {
@@ -312,11 +312,18 @@ uint64_t Game::isPiecePinned(int position, bool color) {
 	static uint64_t bishopAttacks;
 	static uint64_t rookAttacks;
 	uint8_t kingPos = state.kingPosition[color];
-	if(bishopAttacks = getBishopAttacks(kingPos) >> position & 1) {
+	if((bishopAttacks = getBishopAttacks(kingPos) >> position & 1)) {
 		Piece piece = BISHOP;
 		Piece piece2 = QUEEN;
 		// Checking if a bishop is on the same diagonal as the king and one other piece.
-		bishopAttacks = bishopFullMask[kingPos] & bishopAttacks & state.occupiedByColor[!color];
+		bishopAttacks = bishopFullMask[kingPos] & state.occupiedByColor[!color] & getBishopAttacks(position);
+		// printf("BISHOP MASK\n");
+		// printUint(bishopFullMask[kingPos]);
+		// printf("OCCUPIED\n");
+		// printUint(state.occupiedByColor[!color]);
+		// printf("BISHOP ATTACKS\n");
+		// printUint(bishopAttacks);
+
 		while(bishopAttacks) {
 			if(pieceBoolsBish[state.pieces[__builtin_ctzl(bishopAttacks)]]) {
 				// Returns the squares that a piece could move in to stay pinned without the king getting attacked.
@@ -325,15 +332,21 @@ uint64_t Game::isPiecePinned(int position, bool color) {
 			bishopAttacks &= bishopAttacks - 1;
 		}
 		return ALLSET;
-	} else if(rookAttacks = getRookAttacks(kingPos) >> position & 1) {
+	} else if((rookAttacks = getRookAttacks(kingPos) >> position & 1)) {
 		// Checking if a rook is on the same diagonal as the king and one other piece.
-		rookAttacks = rookFullMask[kingPos & rookAttacks & state.occupiedByColor[!color]];
-		while(bishopAttacks) {
-			if(pieceBoolsRook[state.pieces[__builtin_ctzl(bishopAttacks)]]) {
+		rookAttacks = rookFullMask[kingPos] & state.occupiedByColor[!color] & getRookAttacks(position);
+		// printf("Rook MASK\n");
+		// printUint(rookFullMask[kingPos]);
+		// printf("OCCUPIED\n");
+		// printUint(state.occupiedByColor[!color]);
+		// printf("ROOK ATTACKS\n");
+		// printUint(rookAttacks);
+		while(rookAttacks) {
+			if(pieceBoolsRook[state.pieces[__builtin_ctzl(rookAttacks)]]) {
 				// Returns the squares that a piece could move in to stay pinned without the king getting attacked.
 				return (rookMagics[position].mask & rookMagics[kingPos].mask) | (ONE64 << __builtin_ctzl(rookAttacks));
 			}
-			bishopAttacks &= bishopAttacks - 1;
+			rookAttacks &= rookAttacks - 1;
 		}
 		return ALLSET;
 	}
@@ -378,7 +391,7 @@ uint64_t Game::getBlockingMoves(int position, bool color) {
 	piece2 = QUEEN;
 
 	while(attacks) {
-		state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2;
+		// state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2;
 
 		if(state.pieces[__builtin_ctzl(attacks)] == piece || state.pieces[__builtin_ctzl(attacks)] == piece2) {
 			output = output;
@@ -503,6 +516,8 @@ void Game::getPawnMoves(int position, bool color, Move ** moveList) {
 								 0x00000000000000ff};
 	// There is probably some bit trick here OPTIMIZE
 	uint64_t piecePinned = isPiecePinned(position, color);
+	// printf("POSITION %d %d: \n", position/8, position % 8);
+	// printUint(piecePinned);
 	uint64_t output = pawnMoves[color][position] & ~state.occupied & piecePinned;
 	if((output & state.blockerMoves)) {
 		if(isPromotion) {
@@ -823,7 +838,7 @@ uint64_t Game::enumeratedPerft(int depth) {
 		for(Move * i = moveStart; i < moves; i++) {
 			printMove(*i, 1);
 		}
-		printf("\nNodes searched: %llu\n", moves - moveStart);
+		printf("\nNodes searched: %ld\n", moves - moveStart);
 		return moves - moveStart;
 	}
 	GameState redo = state;
