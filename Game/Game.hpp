@@ -7,7 +7,10 @@
 #define GAME_HPP
 
 #define SQUARES 64
-
+#define MAXMOVESPOSSIBLE 220
+#define ONE64 ((uint64_t) 1)
+#define ALLSET (~((uint64_t) 0))
+#define MIN_EVAL (INT_MIN+1)
 
 enum Piece : unsigned char {
 	EMPTY     = 0b0000,
@@ -21,6 +24,7 @@ enum Piece : unsigned char {
 	WHITE     = 0b0000,
 	BLACK     =  0b1000,
 };
+
 
 enum Flag {
 	NONE 		   = 0b0000,
@@ -57,7 +61,8 @@ struct GameState {
 	bool turn;						// 1 byte
 };						// 115 bytes
 
-typedef int (*HeuristicFunction)(GameState *);
+void printMove(Move move);
+int isCapture(GameState * state, Move move);
 
 class Game {
 private:
@@ -93,10 +98,11 @@ public:
 	void printMoveList(Move * beginning, Move * end);
 	void doMove(Move move);
 	GameState getGameState();
+	GameState * getGameStatePtr();
 	void setGameState(GameState in);
 	void doPerft(int depth, uint64_t * moveCount);
 	uint64_t enumeratedPerft(int depth);
-	int alphaBeta(Game * game, int depth, int alpha, int beta, bool maximizingPlayer, HeuristicFunction func);
+	int gameResult();
 
 };
 

@@ -1,11 +1,9 @@
 #include <iostream>
 #include <cstring>
+#include <stdlib.h>
+
 
 #include "Game.hpp"
-
-uint64_t ONE64 = 1;
-uint64_t ALLSET = ~((uint64_t) 0);
-const int MAXMOVESPOSSIBLE = 220;
 
 int convert(int x, int y) {
 	return y * 8 + x;
@@ -317,12 +315,6 @@ uint64_t Game::isPiecePinned(int position, bool color) {
 		Piece piece2 = QUEEN;
 		// Checking if a bishop is on the same diagonal as the king and one other piece.
 		bishopAttacks = bishopFullMask[kingPos] & state.occupiedByColor[!color] & getBishopAttacks(position);
-		// printf("BISHOP MASK\n");
-		// printUint(bishopFullMask[kingPos]);
-		// printf("OCCUPIED\n");
-		// printUint(state.occupiedByColor[!color]);
-		// printf("BISHOP ATTACKS\n");
-		// printUint(bishopAttacks);
 
 		while(bishopAttacks) {
 			if(pieceBoolsBish[state.pieces[__builtin_ctzl(bishopAttacks)]]) {
@@ -335,12 +327,6 @@ uint64_t Game::isPiecePinned(int position, bool color) {
 	} else if((rookAttacks = getRookAttacks(kingPos) >> position & 1)) {
 		// Checking if a rook is on the same diagonal as the king and one other piece.
 		rookAttacks = rookFullMask[kingPos] & state.occupiedByColor[!color] & getRookAttacks(position);
-		// printf("Rook MASK\n");
-		// printUint(rookFullMask[kingPos]);
-		// printf("OCCUPIED\n");
-		// printUint(state.occupiedByColor[!color]);
-		// printf("ROOK ATTACKS\n");
-		// printUint(rookAttacks);
 		while(rookAttacks) {
 			if(pieceBoolsRook[state.pieces[__builtin_ctzl(rookAttacks)]]) {
 				// Returns the squares that a piece could move in to stay pinned without the king getting attacked.
@@ -351,6 +337,10 @@ uint64_t Game::isPiecePinned(int position, bool color) {
 		return ALLSET;
 	}
 	return ALLSET;
+}
+
+int Game::gameResult() {
+	return (state.blockerMoves != ALLSET) * MIN_EVAL;
 }
 
 uint64_t Game::getBlockingMoves(int position, bool color) {
@@ -665,9 +655,19 @@ void Game::getLegalMoves(Move ** moveList) {
 	}
 }
 
+
+void printMove(Move move) {
+	printf("%c%d%c%d", move.from % 8 + 'a', 7 - (move.from / 8) + 1, move.to % 8 + 'a', 7 - (move.to / 8) + 1);
+}
+
+int isCapture(GameState * state, Move move) {
+	return (state->occupiedByColor[!state->turn] & (ONE64 << move.to));
+}
+
 void Game::printMoveList(Move * beginning, Move * end) {
 	for(Move * i = beginning; i < end; i++) {
-		printf("%c%d%c%d\n", i->from % 8 + 'a', 7 - (i->from / 8) + 1, i->to % 8 + 'a', 7 - (i->to / 8) + 1);
+		printMove(*i);
+		// printf("%c%d%c%d\n", i->from % 8 + 'a', 7 - (i->from / 8) + 1, i->to % 8 + 'a', 7 - (i->to / 8) + 1);
 	}
 }
 
@@ -795,8 +795,8 @@ void Game::doMove(Move move) {
 	state.blockerMoves = getBlockingMoves(state.kingPosition[state.turn], state.turn);
 }
 
+static char promotionChar[] = "  nbrq";
 void printMove(Move move, uint64_t moves) {
-	static char promotionChar[] = "  nbrq";
 	
 	if(move.flag & PROMOTE) {
 		printf("%c%d%c%d%c: %llu\n", move.from % 8 + 'a', 
@@ -834,6 +834,11 @@ GameState Game::getGameState() {
 	return state;
 }
 
+GameState * Game::getGameStatePtr() {
+	return &state;
+}
+
+
 void Game::setGameState(GameState in) {
 	state = in;
 }
@@ -846,46 +851,6 @@ int min(int a, int b) {
 	return a < b ? a : b;
 }
 
-int Game::alphaBeta(Game * game, int depth, int alpha, int beta, bool maximizingPlayer, HeuristicFunction func) {
-    if(depth == 0) {
-        return func(&game->state);
-    }
-
-    Move moveStart[MAXMOVESPOSSIBLE];
-    Move * moves = moveStart;
-
-    game->getLegalMoves(&moves);
-
-    int value;
-    GameState undoMove = game->getGameState();
-    if(maximizingPlayer) {
-        value = INT_MIN;
-		for(Move * i = moveStart; i < moves; i++) {
-            game->doMove(*i);
-            // Check if game over
-            value = max(value, alphaBeta(game, depth - 1, alpha, beta, !maximizingPlayer, func));
-            game->setGameState(undoMove);
-            if (value >= beta) {
-                break; // beta cutoff
-            }
-            alpha = max(alpha, value);
-        }
-        return value;
-    } else {
-        value = INT_MAX;
-		for(Move * i = moveStart; i < moves; i++) {
-            game->doMove(*i);
-            // Check if game over
-            value = min(value, alphaBeta(game, depth - 1, alpha, beta, !maximizingPlayer, func));
-            game->setGameState(undoMove);
-            if (value <= alpha) {
-                break; // alpha cutoff
-            }
-            beta = min(beta, value);
-    	}
-        return value;
-    }
-}
 
 uint64_t Game::enumeratedPerft(int depth) {
 	Move moveStart[MAXMOVESPOSSIBLE];
