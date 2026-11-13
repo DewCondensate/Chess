@@ -1,8 +1,9 @@
 #ifndef EVALUATION_HPP
 #define EVALUATION_HPP
 
+
 #include "Game.hpp"
-typedef int (*HeuristicFunction)(GameState *);
+#include "heuristic.hpp"
 
 // typedef struct {
 // 	int 

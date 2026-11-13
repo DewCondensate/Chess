@@ -1,0 +1,3 @@
+*.o
+Game/main
+.DS_Store
