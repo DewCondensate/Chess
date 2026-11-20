@@ -6,6 +6,8 @@
 #include "evaluation.hpp"
 #include "heuristic.hpp"
 
+#include "uci.hpp"
+
 uint8_t convertStringToNum(char * in) {
 	return in[0] - 'a' + (8 - (in[1] - '0')) * 8;
 }
@@ -66,15 +68,20 @@ void move(char * in, char * in2, Flag flag, Game * game) {
 	game->printBoard();
 }
 
-int main(int argc, char * argv[]) {
+int main() {
 	setpriority(PRIO_PROCESS, 0, -20);
 
-	int depth;
-	if(argc > 1) {
-		depth = atoi(argv[1]);
-	} else {
-		depth = 7;
+	char userInput[2000];
+
+	Game game;
+
+
+	while(1) {
+		fgets(userInput, sizeof(userInput), stdin);
+		parseInput(userInput, &game);
 	}
+
+	int depth = 7;
 	
 	Game game = Game((char *) "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 
