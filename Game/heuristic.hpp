@@ -1,9 +1,11 @@
 #ifndef HEURISTIC_HPP
 #define HEURISTIC_HPP
 
+struct ToFrom;
+
 typedef int (*HeuristicFunction)(GameState *);
 
-const int pieceValues[][2][64] = {
+const int pieceValues[][2][SQUARES] = {
 	// Pawn
 	{
 		{0,   0,   0,   0,   0,   0,   0,   0, 
@@ -130,6 +132,40 @@ const int pieceValues[][2][64] = {
 
 const int pieceVal[] = {0, 10, 30, 35, 50, 90, 150};
 
-int heuristic(GameState * state);
+
+class Heuristic {
+	private:
+		int output;
+		int scores[2] = {0, 0};
+	
+	public:
+		int heuristicFullCalculate(GameState * state);
+
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+		int getOutput();
+		void heuristicDoMove(bool turn, ToFrom * toFrom);
+		void heuristicUndoMove(bool turn, ToFrom * toFrom);
+		#endif
+};
+
+class NNUEHeuristic {
+	private:
+		int output;
+		int scores[2] = {0, 0};
+		int16_t neurons[3][64];
+		int16_t biases[2][64];
+		int16_t weights[]
+		
+	public:
+		NNUEHeuristic();
+
+		int heuristicFullCalculate(GameState * state);
+
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+		int getOutput();
+		void heuristicDoMove(bool turn, ToFrom * toFrom);
+		void heuristicUndoMove(bool turn, ToFrom * toFrom);
+		#endif
+};
 
 #endif

@@ -44,7 +44,7 @@ Game::Game(GameState stateIn) {
 }
 
 
-unsigned char rookPositions[64] {0};
+unsigned char rookPositions[SQUARES] {0};
 Flag flagByIndex[3] = {NONE, LEFTROOKMOVE, RIGHTROOKMOVE};
 Game::Game(char inputString[150]) {
 	rookPositions[0] = 1;
@@ -231,16 +231,16 @@ void Game::printBoard() {
 	printf("\n\n");
 }
 
-uint64_t pawnMoves[2][64];
-uint64_t pawnDoubleMoves[2][64];
-uint64_t pawnAttacks[2][64];
-uint64_t knightMoves[64];
-uint64_t kingMoves[64];
+uint64_t pawnMoves[2][SQUARES];
+uint64_t pawnDoubleMoves[2][SQUARES];
+uint64_t pawnAttacks[2][SQUARES];
+uint64_t knightMoves[SQUARES];
+uint64_t kingMoves[SQUARES];
 uint64_t kingSpecialMoves[2][2];
-uint64_t bishopFullMask[64];
-uint64_t rookFullMask[64];
-Magic rookMagics[64];
-Magic bishopMagics[64];
+uint64_t bishopFullMask[SQUARES];
+uint64_t rookFullMask[SQUARES];
+Magic rookMagics[SQUARES];
+Magic bishopMagics[SQUARES];
 uint64_t ** rookAttackTable;
 uint64_t ** bishopAttackTable;
 void Game::readMagicBitboards() {
@@ -698,8 +698,11 @@ void Game::printMoveList(Move * beginning, Move * end) {
 // 	unsigned short fullMove;		// 2 bytes
 // 	bool turn;						// 1 byte
 // } GameState;
-
+#ifdef EFFICIENT_UPDATE_HEURISTIC
+void Game::doMove(Move move, ToFrom * toFrom) {
+#else
 void Game::doMove(Move move) {
+#endif
 	// This reduces branching. It's ugly, but fast.
 	static bool rookPositions[64] = {1, 0, 0, 0, 0, 0, 0, 1,
 									 0, 0, 0, 0, 0, 0, 0, 0,
@@ -733,6 +736,23 @@ void Game::doMove(Move move) {
 	}
 	static char direction[2] = {-8, 8};
 	// goto array?
+
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	toFrom->count = 0;
+	toFrom->from[toFrom->count] = move.from;
+	toFrom->to[toFrom->count] = move.to;
+	toFrom->oldPiece[toFrom->count] = state.pieces[move.from];
+	toFrom->promote[toFrom->count++] = 0;
+
+	// Capture
+	if(state.occupiedByColor[!state.turn] >> move.to & 1) {
+		toFrom->oldPiece[toFrom->count] = state.pieces[move.to];
+		toFrom->from[toFrom->count] = move.to;
+		toFrom->to[toFrom->count] = 65; // Capture is 65
+		toFrom->promote[toFrom->count++] = 0;
+	}
+	#endif
+
 	state.enPassant = 0;
 	state.occupiedByColor[state.turn]  &= ~(ONE64 << move.from); // Remove 'ghost' of piece
 	state.occupiedByColor[state.turn]  |=  (ONE64 << move.to); // Move piece to square
@@ -759,6 +779,13 @@ void Game::doMove(Move move) {
 			state.castling[state.turn][1] = false;
 			break;
 		case RIGHTCASTLE:
+			#ifdef EFFICIENT_UPDATE_HEURISTIC
+			toFrom->from[toFrom->count] = move.to + 1;
+			toFrom->to[toFrom->count] = move.to - 1;
+			toFrom->oldPiece[toFrom->count] = state.pieces[(move.to + 1)];
+			toFrom->promote[toFrom->count++] = 0;
+			#endif
+
 			state.kingPosition[state.turn] = move.to;
 			state.occupiedByColor[state.turn] &= ~(ONE64 << (move.to + 1)); // Remove 'ghost' of piece
 			state.occupiedByColor[state.turn] |=  (ONE64 << (move.to - 1));   // Take put piece there
@@ -768,6 +795,13 @@ void Game::doMove(Move move) {
 			state.castling[state.turn][1] = false;
 			break;
 		case LEFTCASTLE:
+			#ifdef EFFICIENT_UPDATE_HEURISTIC
+			toFrom->from[toFrom->count] = move.to - 2;
+			toFrom->oldPiece[toFrom->count] = state.pieces[(move.to - 2)];
+			toFrom->promote[toFrom->count] = 0;
+			toFrom->to[toFrom->count++] = move.to + 1;
+			#endif
+
 			state.kingPosition[state.turn] = move.to;
 			state.occupiedByColor[state.turn] &= ~(ONE64 << (move.to - 2)); // Remove 'ghost' of piece
 			state.occupiedByColor[state.turn] |=  (ONE64 << (move.to + 1));   // Take put piece there
@@ -777,6 +811,13 @@ void Game::doMove(Move move) {
 			state.castling[state.turn][1] = false;
 			break;
 		case ENPASSANT:
+			#ifdef EFFICIENT_UPDATE_HEURISTIC
+			toFrom->oldPiece[toFrom->count] = state.pieces[move.to - direction[state.turn]];
+			toFrom->from[toFrom->count] = move.to - direction[state.turn];
+			toFrom->promote[toFrom->count] = 0;
+			toFrom->to[toFrom->count++] = 65; // Capture is 65
+			#endif
+
 			state.occupiedByColor[!state.turn] &= ~(ONE64 << (move.to - direction[state.turn]));
 			state.pieces[move.to - direction[state.turn]] = EMPTY;
 			break;
@@ -784,6 +825,10 @@ void Game::doMove(Move move) {
 		case PROMOTEKNIGHT:
 		case PROMOTEBISHOP:
 		case PROMOTEROOK:
+			#ifdef EFFICIENT_UPDATE_HEURISTIC
+			toFrom->promote[0] = (move.flag & PIECEMASK);
+			#endif
+
 			// printf("PROMOTING TO: %d\n", move.flag & PIECEMASK);
 			state.pieces[move.to] = (Piece) (move.flag & PIECEMASK);
 			break;
@@ -814,6 +859,10 @@ void printMove(Move move, uint64_t moves) {
 }
 
 void Game::doPerft(int depth, uint64_t * moveCount) {
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	ToFrom toFrom;
+	#endif
+
 	Move moveStart[MAXMOVESPOSSIBLE];
 	Move * moves = moveStart;
 	getLegalMoves(&moves);
@@ -824,7 +873,11 @@ void Game::doPerft(int depth, uint64_t * moveCount) {
 	}
 
 	for(Move * i = moveStart; i < moves; i++) {
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+		doMove(*i, &toFrom);
+		#else
 		doMove(*i);
+		#endif
 		doPerft(depth - 1, moveCount);
 		state = redo;
 	}
@@ -853,6 +906,10 @@ int min(int a, int b) {
 
 
 uint64_t Game::enumeratedPerft(int depth) {
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	ToFrom toFrom;
+	#endif
+
 	Move moveStart[MAXMOVESPOSSIBLE];
 	Move * moves = moveStart;
 	getLegalMoves(&moves);
@@ -867,7 +924,11 @@ uint64_t Game::enumeratedPerft(int depth) {
 	uint64_t moveCountTotal = 0;
 	uint64_t tempMoveCount;
 	for(Move * i = moveStart; i < moves; i++) {
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+		doMove(*i, &toFrom);
+		#else
 		doMove(*i);
+		#endif
 		tempMoveCount = 0;
 		doPerft(depth - 1, &tempMoveCount);
 		printMove(*i, tempMoveCount);

@@ -6,6 +6,7 @@
 #include "evaluation.hpp"
 #include "heuristic.hpp"
 
+
 uint8_t convertStringToNum(char * in) {
 	return in[0] - 'a' + (8 - (in[1] - '0')) * 8;
 }
@@ -13,11 +14,12 @@ uint8_t convertStringToNum(char * in) {
 char pieceNames[][10] = {"EMPTY", "PAWN", "KNIGHT", "BISHOP", "ROOK", "QUEEN", "KING"};
 
 Move getComputerMove(Game * game, int depth) {
+	Heuristic heuristic;
     Move moveStart[MAXMOVESPOSSIBLE];
     Move * moves = moveStart;
     game->getLegalMoves(&moves);
 
-    Move bestMove = iterativeDeepening(game, depth, heuristic);
+    Move bestMove = iterativeDeepening(game, depth, &heuristic);
 
     return bestMove;
 }
@@ -61,19 +63,31 @@ Move getPlayerMove(Game * game) {
 
 
 void move(char * in, char * in2, Flag flag, Game * game) {
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	ToFrom toFrom;
+	#endif
+
 	Move move = {convertStringToNum(in), convertStringToNum(in2), flag};
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	game->doMove(move, &toFrom);
+	#else
 	game->doMove(move);
+	#endif
 	game->printBoard();
 }
 
 int main(int argc, char * argv[]) {
 	setpriority(PRIO_PROCESS, 0, -20);
 
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	ToFrom toFrom;
+	#endif
+
 	int depth;
 	if(argc > 1) {
 		depth = atoi(argv[1]);
 	} else {
-		depth = 7;
+		depth = 8;
 	}
 	
 	Game game = Game((char *) "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -83,42 +97,24 @@ int main(int argc, char * argv[]) {
 	game.printFen();
 	printf("go perft %d\n\n", depth);
 
-	// struct timespec start, stop;
-	// uint64_t count;
-	// clock_gettime(CLOCK_REALTIME, &start);
-	// count = game.enumeratedPerft(depth);
-	// clock_gettime(CLOCK_REALTIME, &stop);
+	struct timespec start, stop;
+	uint64_t count;
+	clock_gettime(CLOCK_REALTIME, &start);
+	count = game.enumeratedPerft(depth);
+	clock_gettime(CLOCK_REALTIME, &stop);
 
 
-	// uint64_t accum = ( stop.tv_sec - start.tv_sec ) * 1000000000 + ( stop.tv_nsec - start.tv_nsec );
+	uint64_t accum = ( stop.tv_sec - start.tv_sec ) * 1000000000 + ( stop.tv_nsec - start.tv_nsec );
 
-	// printf("Searched %llu nodes in:\n%llu nanoseconds\n%llu microseconds\n%llu milliseconds\n%llu seconds\nThat is %0.0lf nodes per second or %0.3lfMN/s.\n", count, accum, accum/1000, accum/1000000, accum/1000000000, (double) count * 1000000000 / (double) accum, (double) count * 1000000000 / (double) accum / 1000000);
+	printf("Searched %llu nodes in:\n%llu nanoseconds\n%llu microseconds\n%llu milliseconds\n%llu seconds\nThat is %0.0lf nodes per second or %0.3lfMN/s.\n", count, accum, accum/1000, accum/1000000, accum/1000000000, (double) count * 1000000000 / (double) accum, (double) count * 1000000000 / (double) accum / 1000000);
 
 	Move moveStart[MAXMOVESPOSSIBLE];
     Move * moves = moveStart;
     game.getLegalMoves(&moves);
 
-    printf("{\n");
-    for(int i = 0; i < 6; i++) {
-    	printf("\t{\n");
-    	for(int j = 0; j < 2; j++) {
-    		printf("\t\t{\n");
-    		for(int k = 0; k < 8; k++) {
-    			printf("\t\t\t");
-    			for(int l = 0; l < 8; l++) {
-    				printf("%d, ", pieceValues[i][j][k * 8 + l]);
-    			}
-    			printf("\n");
-    		}
-    		printf("\t\t}\n");
-    	}
-    	printf("\t}\n");
-    }
-    printf("}\n");
-
 	Move move;
 	bool playerMove = false;
-	int searchDepth = 7;
+	int searchDepth = depth;
 	while(moves != (Move *) moveStart) {
 		printf("Printing Board...\n"); fflush(stdout);
 		game.printBoard();
@@ -132,7 +128,11 @@ int main(int argc, char * argv[]) {
 		}
 		printf("Playing: %c%d%c%d\n", (move.from % 8) + 'a', 8 - move.from / 8, (move.to % 8) + 'a', 8 - move.to / 8);
 		printf("Playing move...\n"); fflush(stdout);
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+		game.doMove(move, &toFrom);
+		#else
 		game.doMove(move);
+		#endif
 		printf("Printing FEN...\n"); fflush(stdout);
 		game.printFen();
 		printf("Getting legal moves...\n"); fflush(stdout);

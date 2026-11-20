@@ -61,6 +61,16 @@ struct GameState {
 	bool turn;						// 1 byte
 };						// 115 bytes
 
+#ifdef EFFICIENT_UPDATE_HEURISTIC
+struct ToFrom {
+	uint8_t count;
+	uint8_t to[4];
+	uint8_t from[4];
+	uint8_t promote[4];
+	uint8_t oldPiece[4];
+};
+#endif
+
 void printMove(Move move);
 int isCapture(GameState * state, Move move);
 
@@ -96,7 +106,13 @@ public:
 	void printFen();
 	void getLegalMoves(Move ** moveList);
 	void printMoveList(Move * beginning, Move * end);
+	
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	void doMove(Move move, ToFrom * toFrom);
+	#else
 	void doMove(Move move);
+	#endif
+
 	GameState getGameState();
 	GameState * getGameStatePtr();
 	void setGameState(GameState in);

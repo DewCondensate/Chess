@@ -5,6 +5,8 @@ objects := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 
 GXX = g++
 
+DEFINES = -DEFFICIENT_UPDATE_HEURISTIC
+
 .PHONY: all
 all: $(Exec)
 
@@ -13,11 +15,11 @@ check:
 	echo Objects are $(objects)
 
 $(objects): %.o: %.cpp *.hpp
-	$(GXX) -c $(OPTS) $< -o $@
+	$(GXX) -c $(OPTS) $(DEFINES) $(EXTRA_DEFINE) $< -o $@
 
 $(Exec): $(objects)
-	$(GXX) $(OPTS) $(objects) $(cu_objects) -o $(Exec)
-	echo $(GXX) $(OPTS) $(objects) -o $(Exec)
+	$(GXX) $(OPTS) $(DEFINES) $(EXTRA_DEFINE) $(objects) $(cu_objects) -o $(Exec)
+	echo $(GXX) $(OPTS) $(DEFINES) $(EXTRA_DEFINE) $(objects) -o $(Exec)
 
 .PHONY: clean
 clean:

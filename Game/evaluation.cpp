@@ -1,11 +1,20 @@
 #include "evaluation.hpp"
+#include "Game.hpp"
 
 #define MAX(a, b) (a > b ? a : b)
 
-int minMax(Game * game, int depthleft, int startDepth, int alpha, int beta, HeuristicFunction func) {
+int minMax(Game * game, int depthleft, int startDepth, int alpha, int beta, Heuristic * heuristic) {
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	ToFrom toFrom;
+	#endif
+
 	GameState state = game->getGameState();
 	if(depthleft == 0) {
-		return func(&state);
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+		return heuristic->getOutput();
+		#else
+		return heuristic->heuristicFullCalculate(&state);
+		#endif
 	}
 
 	Move moveStart[MAXMOVESPOSSIBLE];
@@ -18,10 +27,34 @@ int minMax(Game * game, int depthleft, int startDepth, int alpha, int beta, Heur
 		return game->gameResult();
 	}
 
+
 	for(Move * i = moveStart; i < moves; i++) {
-        game->doMove(*i);
-		int tempScore = -minMax(game, depthleft - 1, startDepth, -beta, -alpha, func);
-        game->setGameState(state);
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+        	game->doMove(*i, &toFrom);
+			heuristic->heuristicDoMove(state.turn, &toFrom);
+
+			// int incremental = heuristic->getOutput();
+
+			// GameState state2 = game->getGameState();
+
+			// Heuristic test;
+			// int full = test.heuristicFullCalculate(&state2);
+
+			// if (incremental != full) {
+			// 	printf("HEURISTIC MISMATCH in minmax %d: incremental=%d full=%d\n",
+			// 		depthleft, incremental, full);
+			// 	printf("To: %d, from %d\n", toFrom.to[0], toFrom.from[0]);
+			// 	return 1;
+			// }
+		#else
+        	game->doMove(*i);
+		#endif
+		int tempScore = -minMax(game, depthleft - 1, startDepth, -beta, -alpha, heuristic);
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+			heuristic->heuristicUndoMove(state.turn, &toFrom);
+		#endif
+        
+		game->setGameState(state);
 
 		bestValue = MAX(bestValue, tempScore);
 
@@ -121,8 +154,13 @@ void quickSort(Move moves[], int eval[], int low, int high) {
 // }
 
 #define ABS(x) (x < 0 ? -x : x)
-Move iterativeDeepening(Game * game, int depth, HeuristicFunction func) {
+Move iterativeDeepening(Game * game, int depth, Heuristic * heuristic) {
+	#ifdef EFFICIENT_UPDATE_HEURISTIC
+	ToFrom toFrom;
+	#endif
+
 	GameState state = game->getGameState();
+	heuristic->heuristicFullCalculate(&state);
 
 	IterativeDeepening moves;
 
@@ -131,9 +169,31 @@ Move iterativeDeepening(Game * game, int depth, HeuristicFunction func) {
 
 	int bestEval = MIN_EVAL;
 	for(int j = 0; j < moveEnd - moves.moves; j++) {
-		game->doMove(moves.moves[j]);
-		// moves.eval[j] = -iterativeEval(game, i, func);
-		moves.eval[j] = -minMax(game, depth - 2, depth - 2, MIN_EVAL, -MIN_EVAL, func);
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+        	game->doMove(moves.moves[j], &toFrom);
+			// printf("Current output: %d\n", heuristic->getOutput());
+			heuristic->heuristicDoMove(state.turn, &toFrom);
+
+			// int incremental = heuristic->getOutput();
+
+			// Heuristic test;
+			// GameState state2 = game->getGameState();
+			// int full = test.heuristicFullCalculate(&state2);
+
+			// if (incremental != full) {
+			// 	printf("HEURISTIC MISMATCH in iterative deepening %d: incremental=%d full=%d\n",
+			// 		j, incremental, full);
+			// 	printf("To: %d, from %d\n", toFrom.to[0], toFrom.from[0]);
+			// 	// break;
+			// 	}
+		#else
+        	game->doMove(moves.moves[j]);
+		#endif
+		moves.eval[j] = -minMax(game, depth - 2, depth - 2, MIN_EVAL, -MIN_EVAL, heuristic);
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+			heuristic->heuristicUndoMove(state.turn, &toFrom);
+		#endif
+
 		bestEval = MAX(bestEval, moves.eval[j]);
 		game->setGameState(state);
 	}
@@ -163,9 +223,17 @@ Move iterativeDeepening(Game * game, int depth, HeuristicFunction func) {
 			return moves.moves[0];
 		}
 
-		game->doMove(moves.moves[j]);
-		// moves.eval[j] = -iterativeEval(game, i, func);
-		moves.eval[j] = -minMax(game, depth - 1, depth - 1, MIN_EVAL, -MIN_EVAL, func);
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+        	game->doMove(moves.moves[j], &toFrom);
+			heuristic->heuristicDoMove(state.turn, &toFrom);
+		#else
+        	game->doMove(moves.moves[j]);
+		#endif
+		moves.eval[j] = -minMax(game, depth - 1, depth - 1, MIN_EVAL, -MIN_EVAL, heuristic);
+		#ifdef EFFICIENT_UPDATE_HEURISTIC
+			heuristic->heuristicUndoMove(state.turn, &toFrom);
+		#endif
+
 		bestEval = MAX(bestEval, moves.eval[j]);
 		game->setGameState(state);
 	}
