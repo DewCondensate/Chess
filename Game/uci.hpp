@@ -6,7 +6,7 @@
 enum EngineState {
 	CONTINUE,
 	HALT,
-	QUIT
+	QUIT_IMMEDIATE
 };
 
 enum Command {
@@ -25,28 +25,20 @@ enum Command {
 };
 
 EngineState parseInput(char userInput[2000], Game * game);
-
 EngineState parseCommandUci(Game * game);
-
 EngineState parseCommandDebug(Game * game);
-
 EngineState parseCommandIsready(Game * game);
-
 EngineState parseCommandSetoption(Game * game);
-
 EngineState parseCommandRegister(Game * game);
-
 EngineState parseCommandUcinewgame(Game * game);
-
 EngineState parseCommandPosition(Game * game);
-
 EngineState parseCommandGo(Game * game);
-
 EngineState parseCommandStop(Game * game);
-
 EngineState parseCommandPonderhit(Game * game);
-
 EngineState parseCommandQuit(Game * game);
+
+void sendID();
+void sendOptions();
 
 
 #endif

@@ -81,6 +81,7 @@ int main() {
 		parseInput(userInput, &game);
 	}
 
+	/*
 	int depth = 7;
 	
 	Game game = Game((char *) "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -158,4 +159,6 @@ int main() {
 			printf("Black wins!\n");
 		}
 	}
+
+	*/
 }

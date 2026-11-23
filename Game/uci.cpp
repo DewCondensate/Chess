@@ -31,33 +31,62 @@ EngineState parseInput(char userInput[2000], Game * game) {
         case DEBUG:
             return parseCommandDebug(game);
         case ISREADY:
-            return parseCommandIsready(game);
+            // return parseCommandIsready(game);
         case SETOPTION:
-            return parseCommandSetoption(game);
+            // return parseCommandSetoption(game);
         case REGISTER:
-            return parseCommandRegister(game);
+            // return parseCommandRegister(game);
         case UCINEWGAME:
-            return parseCommandUcinewgame(game);
+            // return parseCommandUcinewgame(game);
         case POSITION:
-            return parseCommandPosition(game);
+            // return parseCommandPosition(game);
         case GO:
-            return parseCommandGo(game);
+            // return parseCommandGo(game);
         case STOP:
-            return parseCommandStop(game);
+            // return parseCommandStop(game);
         case PONDERHIT:
-            return parseCommandPonderhit(game);
+            // return parseCommandPonderhit(game);
         case QUIT:
-            return parseCommandQuit(game);
+            // return parseCommandQuit(game);
         case UNKNOWN:
             return CONTINUE;
     }
 }
 
-EngineState parseInput(char userInput[2000], Game * game);
+EngineState parseCommandUci(Game * game) {
+    int argumentCount = 1;
+    while(strtok(NULL, " ") != NULL) {
+        printf("info string %d extra argument(s) supplied...\n", argumentCount++);
+    }
 
-EngineState parseCommandUci(Game * game);
+    sendID();
+    sendOptions();
 
-EngineState parseCommandDebug(Game * game);
+    return CONTINUE;
+}
+
+EngineState parseCommandDebug(Game * game) {
+    int argumentCount = 1;
+    char * token = strtok(NULL, " ");
+
+    if(strcmp(token, "no")) {
+        // Does nothing for now
+        return CONTINUE;
+    }
+
+    if(strcmp(token, "yes")) {
+        // Does nothing for now
+        return CONTINUE;
+    }
+
+    token = strtok(NULL, " ");
+    while(token != NULL) {
+        printf("info string %d extra argument(s) supplied...\n", argumentCount++);
+        token = strtok(NULL, " ");
+    }
+
+    return CONTINUE;
+}
 
 EngineState parseCommandIsready(Game * game);
 
@@ -76,3 +105,16 @@ EngineState parseCommandStop(Game * game);
 EngineState parseCommandPonderhit(Game * game);
 
 EngineState parseCommandQuit(Game * game);
+
+void sendID() {
+    printf("name DewChess\n");
+    printf("author dew\n");
+}
+
+void sendOptions() {
+    // Do nothing for now
+}
+
+void uciok() {
+    printf("uciok\n");
+}
