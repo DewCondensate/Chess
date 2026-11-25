@@ -2,6 +2,11 @@
 
 #include "uci.hpp"
 
+const char * engineOptions[] = {
+	"nooption1",
+	"nooption2"
+};
+
 Command readCommand(char * input) {
     Command output = UNKNOWN;
 
@@ -31,11 +36,11 @@ EngineState parseInput(char userInput[2000], Game * game) {
         case DEBUG:
             return parseCommandDebug(game);
         case ISREADY:
-            // return parseCommandIsready(game);
+            return parseCommandIsready(game);
         case SETOPTION:
-            // return parseCommandSetoption(game);
+            return parseCommandSetoption(game);
         case REGISTER:
-            // return parseCommandRegister(game);
+            return parseCommandRegister(game);
         case UCINEWGAME:
             // return parseCommandUcinewgame(game);
         case POSITION:
@@ -54,31 +59,36 @@ EngineState parseInput(char userInput[2000], Game * game) {
 }
 
 EngineState parseCommandUci(Game * game) {
+    sendID();
+    sendOptions();
+    
     int argumentCount = 1;
     while(strtok(NULL, " ") != NULL) {
         printf("info string %d extra argument(s) supplied...\n", argumentCount++);
     }
 
-    sendID();
-    sendOptions();
-
     return CONTINUE;
 }
 
 EngineState parseCommandDebug(Game * game) {
-    int argumentCount = 1;
     char * token = strtok(NULL, " ");
 
-    if(strcmp(token, "no")) {
-        // Does nothing for now
+    if(token == NULL) {
+        printf("info string not enough arguments supplied\n");
         return CONTINUE;
     }
 
-    if(strcmp(token, "yes")) {
+    if(strcmp(token, "no") == 0) {
         // Does nothing for now
-        return CONTINUE;
+        printf("info string debug set to no\n");
     }
 
+    if(strcmp(token, "yes") == 0) {
+        // Does nothing for now
+        printf("info string debug set to yes\n");
+    }
+
+    int argumentCount = 1;
     token = strtok(NULL, " ");
     while(token != NULL) {
         printf("info string %d extra argument(s) supplied...\n", argumentCount++);
@@ -88,11 +98,83 @@ EngineState parseCommandDebug(Game * game) {
     return CONTINUE;
 }
 
-EngineState parseCommandIsready(Game * game);
+EngineState parseCommandIsready(Game * game) {
+    readyok();
 
-EngineState parseCommandSetoption(Game * game);
+    int argumentCount = 1;
 
-EngineState parseCommandRegister(Game * game);
+    char * token = strtok(NULL, " ");
+    while(token != NULL) {
+        printf("info string %d extra argument(s) supplied...\n", argumentCount++);
+        token = strtok(NULL, " ");
+    }
+
+    return CONTINUE;
+}
+
+EngineState parseCommandSetoption(Game * game) {
+    char * token = strtok(NULL, " ");
+    
+    if(token == NULL) {
+        printf("info string setoption 'name' not provided\n");
+        return CONTINUE;
+    }
+
+    if(strcmp(token, "name") != 0) {
+        printf("info string setoption expected 'name'\n");
+        return CONTINUE;
+    }
+
+    token = strtok(NULL, " ");
+
+    if(token == NULL) {
+        printf("info string setoption name parameter not provided\n");
+        return CONTINUE;
+    }
+
+    EngineOption option = ENGINE_OPTION_END;
+
+    toLowerCase(token);
+
+    for(int i = 0; i < ENGINE_OPTION_END; i++) {
+        if(strcmp(engineOptions[i], token) == 0) {
+            option = (EngineOption) i;
+        }
+    }
+
+    if(option == ENGINE_OPTION_END) {
+        printf("info string setoption unknown option name '%s'\n", token);
+        return CONTINUE;
+    }
+
+    token = strtok(NULL, " ");
+
+    if(token == NULL) {
+        printf("info string setoption no value provided\n");
+        return CONTINUE;
+    }
+
+    if(strcmp(token, "value") != 0) {
+        printf("info string setoption expected 'value'\n");
+        return CONTINUE;
+    }
+
+    token = strtok(NULL, " ");
+
+    if(token == NULL) {
+        printf("info string setoption no value parameter provided\n");
+        return CONTINUE;
+    }
+
+    printf("info string setoption '%s' to '%s'\n", engineOptions[option], token);
+
+    return CONTINUE;
+}
+
+EngineState parseCommandRegister(Game * game) {
+    printf("info string registration is not required\n");
+    return CONTINUE;
+}
 
 EngineState parseCommandUcinewgame(Game * game);
 
@@ -106,6 +188,13 @@ EngineState parseCommandPonderhit(Game * game);
 
 EngineState parseCommandQuit(Game * game);
 
+void toLowerCase(char * input) {
+    while(*input != '\0') {
+        *input += ('a' - 'A') * (*input >= 'A' && *input <= 'Z');
+        input++;
+    }
+}
+
 void sendID() {
     printf("name DewChess\n");
     printf("author dew\n");
@@ -117,4 +206,8 @@ void sendOptions() {
 
 void uciok() {
     printf("uciok\n");
+}
+
+void readyok() {
+    printf("readyok\n");
 }

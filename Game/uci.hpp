@@ -24,6 +24,12 @@ enum Command {
     UNKNOWN
 };
 
+enum EngineOption {
+	noOption1,
+	noOption2,
+	ENGINE_OPTION_END
+};
+
 EngineState parseInput(char userInput[2000], Game * game);
 EngineState parseCommandUci(Game * game);
 EngineState parseCommandDebug(Game * game);
@@ -39,6 +45,8 @@ EngineState parseCommandQuit(Game * game);
 
 void sendID();
 void sendOptions();
-
+void uciok();
+void readyok();
+void toLowerCase(char * input);
 
 #endif

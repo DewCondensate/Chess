@@ -78,6 +78,7 @@ int main() {
 
 	while(1) {
 		fgets(userInput, sizeof(userInput), stdin);
+		userInput[strcspn(userInput, "\n")] = 0;
 		parseInput(userInput, &game);
 	}
 
