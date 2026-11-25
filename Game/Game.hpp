@@ -69,6 +69,7 @@ private:
 	// Using a struct allows games to be easily copied for easier depth search.
 	GameState state;
 
+
 	void readMagicBitboards();
 
 	uint64_t isPiecePinned(int position, bool color);
@@ -92,6 +93,7 @@ private:
 public:
 	Game(GameState stateIn);
 	Game(char input[150] = 0);
+	void loadFromFEN(char input[150] = 0);
 	void printBoard();
 	void printFen();
 	void getLegalMoves(Move ** moveList);

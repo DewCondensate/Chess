@@ -48,5 +48,6 @@ void sendOptions();
 void uciok();
 void readyok();
 void toLowerCase(char * input);
+Move parseMove(Game * game, char * input);
 
 #endif

@@ -47,6 +47,10 @@ Game::Game(GameState stateIn) {
 unsigned char rookPositions[64] {0};
 Flag flagByIndex[3] = {NONE, LEFTROOKMOVE, RIGHTROOKMOVE};
 Game::Game(char inputString[150]) {
+	this->loadFromFEN(inputString);
+}
+
+void Game::loadFromFEN(char inputString[150]) {
 	rookPositions[0] = 1;
 	rookPositions[7] = 2;
 	rookPositions[56] = 1;

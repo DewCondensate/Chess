@@ -42,9 +42,9 @@ EngineState parseInput(char userInput[2000], Game * game) {
         case REGISTER:
             return parseCommandRegister(game);
         case UCINEWGAME:
-            // return parseCommandUcinewgame(game);
+            return parseCommandUcinewgame(game);
         case POSITION:
-            // return parseCommandPosition(game);
+            return parseCommandPosition(game);
         case GO:
             // return parseCommandGo(game);
         case STOP:
@@ -176,9 +176,71 @@ EngineState parseCommandRegister(Game * game) {
     return CONTINUE;
 }
 
-EngineState parseCommandUcinewgame(Game * game);
+EngineState parseCommandUcinewgame(Game * game) {
+    int argumentCount = 1;
 
-EngineState parseCommandPosition(Game * game);
+    char * token = strtok(NULL, " ");
+    while(token != NULL) {
+        printf("info string %d extra argument(s) supplied...\n", argumentCount++);
+        token = strtok(NULL, " ");
+    }
+
+    printf("info string ucinewgame received\n");
+    return CONTINUE;
+}
+
+EngineState parseCommandPosition(Game * game) {
+    char * token = strtok(NULL, " ");
+    
+    if(token == NULL) {
+        printf("info string position no position provided\n");
+        return CONTINUE;
+    }
+
+    if(strcmp(token, "fen") == 0) {
+        token = strtok(NULL, "\n");
+
+        if(token == NULL) {
+            printf("info string no fen provided\n");
+            return CONTINUE;
+        }
+
+        // NOTE: THIS IS NOT ERROR SAFE!!
+        game->loadFromFEN(token);
+
+        int argumentCount = 1;
+        
+        token = strtok(NULL, " ");
+        while(token != NULL) {
+            printf("info string %d extra argument(s) supplied...\n", argumentCount++);
+            token = strtok(NULL, " ");
+        }
+
+        printf("info string fen loaded!\n");
+        return CONTINUE;
+    }
+
+    if(strcmp(token, "startpos") == 0) {
+        token = strtok(NULL, " ");
+        game->loadFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+
+        while(token != NULL) {
+            Move move = parseMove(game, token);
+            if(move.to == 0 && move.from == 0 && move.flag == NONE) {
+                printf("info string invalid move %s\n", token);
+                return CONTINUE;
+            }
+            game->doMove(move);
+            token = strtok(NULL, " ");
+        }
+        printf("info string fen loaded!\n");
+
+        return CONTINUE;
+    }
+
+    printf("info string position unknown argument '%s'\n", token);
+    return CONTINUE;
+}
 
 EngineState parseCommandGo(Game * game);
 
@@ -210,4 +272,65 @@ void uciok() {
 
 void readyok() {
     printf("readyok\n");
+}
+
+Move parseMove(Game * game, char * input) {
+    Move * output = 0;
+	Move moveStart[MAXMOVESPOSSIBLE];
+    Move * moves = moveStart;
+	game->getLegalMoves(&moves);
+
+    char col = input[0];
+    int row = input[1] - '0';
+    char col2 = input[2];
+    int row2 = input[3] - '0';
+    row -= 1;
+    row = 7 - row;
+    col = col >= 'a' ? col - 'a' + 'A' : col;
+    col -= 'A';
+    int from = row * 8 + col;
+
+    row2 -= 1;
+    row2 = 7 - row2;
+    col2 = col2 >= 'a' ? col2 - 'a' + 'A' : col2;
+    col2 -= 'A';
+    int to = row2 * 8 + col2;
+
+    Flag promotion = NONE;
+    if(input[4] != '\0') {
+        char promotionChar = input[4] >= 'a' ? input[4] - ('a' - 'A') : input[4];
+
+        switch(promotionChar) {
+            case 'K':
+                promotion = PROMOTEKNIGHT;
+                break;
+            case 'B':
+                promotion = PROMOTEBISHOP;
+                break;  
+            case 'R':
+                promotion = PROMOTEROOK;
+                break;
+            case 'Q':
+                promotion = PROMOTEQUEEN;
+                break;
+            default:
+                return Move{0, 0, NONE};
+        }
+    }
+
+    for(Move * i = moveStart; i < moves; i++) {
+        if(i->from == from && i->to == to) {
+            if(promotion != NONE) {
+                if(i->flag == promotion) {
+                    output = i;
+                    break;
+                }
+            } else {
+                output = i;
+                break;
+            }
+        }
+    }
+
+	return (output == 0) ? Move{0, 0, NONE} : *output;
 }
