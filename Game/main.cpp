@@ -74,12 +74,15 @@ int main() {
 	char userInput[2000];
 
 	Game game;
+	EngineGoOptions options;
 
 
 	while(1) {
 		fgets(userInput, sizeof(userInput), stdin);
 		userInput[strcspn(userInput, "\n")] = 0;
-		parseInput(userInput, &game);
+		parseInput(userInput, &game, &options);
+
+		
 	}
 
 	/*

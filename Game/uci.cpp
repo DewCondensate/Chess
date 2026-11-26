@@ -1,6 +1,7 @@
 #include <cstring>
 
 #include "uci.hpp"
+#include "Game.hpp"
 
 const char * engineOptions[] = {
 	"nooption1",
@@ -26,39 +27,39 @@ Command readCommand(char * input) {
     return output;
 }
 
-EngineState parseInput(char userInput[2000], Game * game) {
+EngineCommand parseInput(char userInput[2000], Game * game, EngineGoOptions * options) {
 	char * token = strtok(userInput, " ");
     Command command = readCommand(token);
 
     switch(command) {
         case UCI:
-            return parseCommandUci(game);
+            return parseCommandUci(game, options);
         case DEBUG:
-            return parseCommandDebug(game);
+            return parseCommandDebug(game, options);
         case ISREADY:
-            return parseCommandIsready(game);
+            return parseCommandIsready(game, options);
         case SETOPTION:
-            return parseCommandSetoption(game);
+            return parseCommandSetoption(game, options);
         case REGISTER:
-            return parseCommandRegister(game);
+            return parseCommandRegister(game, options);
         case UCINEWGAME:
-            return parseCommandUcinewgame(game);
+            return parseCommandUcinewgame(game, options);
         case POSITION:
-            return parseCommandPosition(game);
+            return parseCommandPosition(game, options);
         case GO:
-            // return parseCommandGo(game);
+            return parseCommandGo(game, options);
         case STOP:
-            // return parseCommandStop(game);
+            // return parseCommandStop(game, options);
         case PONDERHIT:
-            // return parseCommandPonderhit(game);
+            // return parseCommandPonderhit(game, options);
         case QUIT:
-            // return parseCommandQuit(game);
+            // return parseCommandQuit(game, options);
         case UNKNOWN:
             return CONTINUE;
     }
 }
 
-EngineState parseCommandUci(Game * game) {
+EngineCommand parseCommandUci(Game * game, EngineGoOptions * options) {
     sendID();
     sendOptions();
     
@@ -70,7 +71,7 @@ EngineState parseCommandUci(Game * game) {
     return CONTINUE;
 }
 
-EngineState parseCommandDebug(Game * game) {
+EngineCommand parseCommandDebug(Game * game, EngineGoOptions * options) {
     char * token = strtok(NULL, " ");
 
     if(token == NULL) {
@@ -98,7 +99,7 @@ EngineState parseCommandDebug(Game * game) {
     return CONTINUE;
 }
 
-EngineState parseCommandIsready(Game * game) {
+EngineCommand parseCommandIsready(Game * game, EngineGoOptions * options) {
     readyok();
 
     int argumentCount = 1;
@@ -112,7 +113,7 @@ EngineState parseCommandIsready(Game * game) {
     return CONTINUE;
 }
 
-EngineState parseCommandSetoption(Game * game) {
+EngineCommand parseCommandSetoption(Game * game, EngineGoOptions * options) {
     char * token = strtok(NULL, " ");
     
     if(token == NULL) {
@@ -171,12 +172,12 @@ EngineState parseCommandSetoption(Game * game) {
     return CONTINUE;
 }
 
-EngineState parseCommandRegister(Game * game) {
+EngineCommand parseCommandRegister(Game * game, EngineGoOptions * options) {
     printf("info string registration is not required\n");
     return CONTINUE;
 }
 
-EngineState parseCommandUcinewgame(Game * game) {
+EngineCommand parseCommandUcinewgame(Game * game, EngineGoOptions * options) {
     int argumentCount = 1;
 
     char * token = strtok(NULL, " ");
@@ -189,8 +190,9 @@ EngineState parseCommandUcinewgame(Game * game) {
     return CONTINUE;
 }
 
-EngineState parseCommandPosition(Game * game) {
+EngineCommand parseCommandPosition(Game * game, EngineGoOptions * options) {
     char * token = strtok(NULL, " ");
+    const char startpos[150] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     
     if(token == NULL) {
         printf("info string position no position provided\n");
@@ -222,7 +224,7 @@ EngineState parseCommandPosition(Game * game) {
 
     if(strcmp(token, "startpos") == 0) {
         token = strtok(NULL, " ");
-        game->loadFromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        game->loadFromFEN((char *) startpos);
 
         while(token != NULL) {
             Move move = parseMove(game, token);
@@ -242,13 +244,145 @@ EngineState parseCommandPosition(Game * game) {
     return CONTINUE;
 }
 
-EngineState parseCommandGo(Game * game);
+EngineCommand parseCommandGo(Game * game, EngineGoOptions * options) {
+    // Move bestMove = iterativeDeepening(game, depth, heuristic);
 
-EngineState parseCommandStop(Game * game);
+    // No options
+    int moveNumber = 0;
+    options->infinite = 0;
+    options->depth = -1;
+    options->perft = -1;
 
-EngineState parseCommandPonderhit(Game * game);
+    char * token;
+    uint8_t cancelStrTok = 0;
+    
+    
+    while(1) {
+        if(!cancelStrTok) {
+            token = strtok(NULL, " ");
+        }
+        cancelStrTok = 0;
+    
+        if(token == NULL) {
+            printf("info string no options provided to 'go'\n");
+            break;
+        }
+    
+        if(strcmp(token, "searchmoves")) {
+            token = strtok(NULL, " ");
+    
+            if(token == NULL) {
+                printf("info string end of search moves\n");
+                break;
+            }
+    
+            Move move = parseMove(game, token);
+            if(move.to == 0 && move.from == 0 && move.flag == NONE) {
+                printf("info string invalid move found, assuming it's another argument...\n");
+                cancelStrTok = 1;
+                continue;
+            }
 
-EngineState parseCommandQuit(Game * game);
+            options->searchMoves[moveNumber++] = move;
+        }
+        if(strcmp(token, "ponder") == 0) {
+            options->ponder = 1;
+            break;
+        }
+        if(strcmp(token, "wtime") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid white time supplied\n");
+                continue;
+            }
+
+            options->whiteTimeMs = parsedInt;
+        }
+        if(strcmp(token, "btime") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid black time supplied\n");
+                continue;
+            }
+
+            options->blackTimeMs = parsedInt;
+        }
+        if(strcmp(token, "winc") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid white increment supplied\n");
+                continue;
+            }
+
+            options->whiteIncrementPerMoveMs = parsedInt;
+        }
+        if(strcmp(token, "binc") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid black increment supplied\n");
+                continue;
+            }
+
+            options->blackIncrementPerMoveMs = parsedInt;
+        }
+        if(strcmp(token, "depth") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid depth supplied\n");
+                continue;
+            }
+
+            options->depth = parsedInt;
+        }
+        if(strcmp(token, "nodes") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid nodes supplied\n");
+                continue;
+            }
+
+            options->nodes = parsedInt;
+        }
+        if(strcmp(token, "mate") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid mate supplied\n");
+                continue;
+            }
+
+            options->mate = parsedInt;
+        }
+        if(strcmp(token, "movetime") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid move time supplied\n");
+                continue;
+            }
+
+            options->moveTime = parsedInt;
+        }
+        if(strcmp(token, "perft") == 0) {
+            int parsedInt = parseInt(token);
+            if(parsedInt == -1) {
+                printf("info string invalid perft supplied\n");
+                continue;
+            }
+
+            options->perft = parsedInt;
+        }
+        if(strcmp(token, "infinite") == 0) {
+            options->infinite = 1;
+        }
+    }
+
+    return START_SEARCH;
+}
+
+EngineCommand parseCommandStop(Game * game, EngineGoOptions * options);
+
+EngineCommand parseCommandPonderhit(Game * game, EngineGoOptions * options);
+
+EngineCommand parseCommandQuit(Game * game, EngineGoOptions * options);
 
 void toLowerCase(char * input) {
     while(*input != '\0') {
@@ -333,4 +467,19 @@ Move parseMove(Game * game, char * input) {
     }
 
 	return (output == 0) ? Move{0, 0, NONE} : *output;
+}
+
+int parseInt(char * token) {
+    int output = 0;
+
+    while(*token != '\0') {
+        if(*token < '0' || *token > '9') {
+            return -1;
+        }
+
+        output *= 10;
+        output += *token - '0';
+    }
+    
+    return output;
 }
