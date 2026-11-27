@@ -49,7 +49,7 @@ EngineCommand parseInput(char userInput[2000], Game * game, EngineGoOptions * op
         case GO:
             return parseCommandGo(game, options);
         case STOP:
-            // return parseCommandStop(game, options);
+            return parseCommandStop(game, options);
         case PONDERHIT:
             // return parseCommandPonderhit(game, options);
         case QUIT:
@@ -378,11 +378,44 @@ EngineCommand parseCommandGo(Game * game, EngineGoOptions * options) {
     return START_SEARCH;
 }
 
-EngineCommand parseCommandStop(Game * game, EngineGoOptions * options);
+EngineCommand parseCommandStop(Game * game, EngineGoOptions * options) {
+    int argumentCount = 1;
 
-EngineCommand parseCommandPonderhit(Game * game, EngineGoOptions * options);
+    char * token = strtok(NULL, " ");
+    while(token != NULL) {
+        printf("info string %d extra argument(s) supplied...\n", argumentCount++);
+        token = strtok(NULL, " ");
+    }
 
-EngineCommand parseCommandQuit(Game * game, EngineGoOptions * options);
+    printf("info string stop received\n");
+    return HALT;
+}
+
+EngineCommand parseCommandPonderhit(Game * game, EngineGoOptions * options) {
+    int argumentCount = 1;
+
+    char * token = strtok(NULL, " ");
+    while(token != NULL) {
+        printf("info string %d extra argument(s) supplied...\n", argumentCount++);
+        token = strtok(NULL, " ");
+    }
+
+    printf("info string ponderhit received\n");
+    return START_SEARCH;
+}
+
+EngineCommand parseCommandQuit(Game * game, EngineGoOptions * options) {
+    int argumentCount = 1;
+
+    char * token = strtok(NULL, " ");
+    while(token != NULL) {
+        printf("info string %d extra argument(s) supplied...\n", argumentCount++);
+        token = strtok(NULL, " ");
+    }
+
+    printf("info string quit immediate received\n");
+    return QUIT_IMMEDIATE;
+}
 
 void toLowerCase(char * input) {
     while(*input != '\0') {
